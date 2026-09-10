@@ -1,0 +1,53 @@
+{
+  "vendor": "myvendor",
+  "name": "paysave",
+  "version": "1.0.0",
+  "title": "PaySave — Recuperação de Pagamento",
+  "description": "Exibe um modal de alternativas de pagamento quando uma transação é recusada no Checkout v6 da VTEX, aumentando a taxa de recuperação de vendas sem interferir no fluxo nativo.",
+  "builders": {
+    "pixel": "1.x"
+  },
+  "settingsSchema": {
+    "title": "PaySave",
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "title": "Ativar PaySave",
+        "description": "Liga ou desliga o modal de recuperação. Use como feature flag de emergência.",
+        "type": "boolean",
+        "default": true
+      },
+      "reservationMinutes": {
+        "title": "Tempo de reserva exibido (minutos)",
+        "description": "Quantos minutos o modal mostra como tempo de reserva do produto.",
+        "type": "number",
+        "default": 10
+      },
+      "showPixDiscount": {
+        "title": "Mostrar badge de desconto no Pix",
+        "description": "Exibe um badge promocional na opção Pix dentro do modal.",
+        "type": "boolean",
+        "default": false
+      },
+      "pixDiscountLabel": {
+        "title": "Texto do badge de desconto Pix",
+        "description": "Ex: '15% OFF'. Só aparece se a opção acima estiver ativa.",
+        "type": "string",
+        "default": "15% OFF"
+      },
+      "assistantName": {
+        "title": "Nome da assistente de chat",
+        "description": "Nome exibido no chat de recuperação. Ex: Nina, Ana, Bia.",
+        "type": "string",
+        "default": "Nina"
+      },
+      "sendAnalytics": {
+        "title": "Enviar eventos para dataLayer (GTM/GA4)",
+        "description": "Empurra eventos de recuperação para window.dataLayer, compatível com Google Tag Manager.",
+        "type": "boolean",
+        "default": true
+      }
+    }
+  },
+  "$schema": "https://raw.githubusercontent.com/vtex/node-vtex-api/master/gen/manifest.schema.json"
+}
