@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b6e4f" />
+  <title>Checkout Rescue — protótipo VTEX</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="https://www.trocafone.com.br/" aria-label="Trocafone"><img src="https://trocafone.vtexassets.com/assets/vtex.file-manager-graphql/images/4fde4f70-8bba-40ef-b6df-9ffd45b5ec25___66a991f457f062abda2484464a9f124a.png" alt="Trocafone"></a>
+    <div class="secure"><span>●</span> Compra 100% segura</div>
+  </header>
+
+  <main class="shell">
+    <nav class="steps" aria-label="Etapas do checkout">
+      <span class="done"><b>✓</b> Identificação</span><i></i>
+      <span class="done"><b>✓</b> Entrega</span><i></i>
+      <span class="active"><b>3</b> Pagamento</span>
+    </nav>
+
+    <section class="prototype-note">
+      <div><span class="pulse"></span><strong>Fase isolada: recusa do pagamento</strong> — o protótipo começa somente quando a VTEX retorna a negativa.</div>
+      <button id="openMetrics" class="text-button">Ver eventos do funil →</button>
+    </section>
+
+    <div class="checkout-grid">
+      <section class="payment-card">
+        <div class="section-heading">
+          <div><span class="eyebrow">ÚLTIMA ETAPA</span><h1>Como você quer pagar?</h1></div>
+          <span class="order-id">Pedido #142938</span>
+        </div>
+
+        <div class="payment-tabs" role="tablist">
+          <button class="tab active" data-method="card">▣ Cartão de crédito</button>
+          <button class="tab" data-method="pix">◇ Pix</button>
+          <button class="tab" data-method="boleto">▤ Boleto</button>
+        </div>
+
+        <form id="paymentForm" class="payment-form">
+          <div id="cardFields">
+            <label>Número do cartão<div class="input-wrap"><input value="•••• •••• •••• 4242" aria-label="Número do cartão"><span>VISA</span></div></label>
+            <label>Nome impresso no cartão<input value="RHENAN TEIXEIRA"></label>
+            <div class="row"><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div>
+            <label>Parcelas<select><option>12x de R$ 108,25 sem juros</option><option>10x de R$ 129,90 sem juros</option><option>1x de R$ 1.299,00</option></select></label>
+          </div>
+          <div id="altMethod" class="alt-method hidden"></div>
+          <div class="summary-line"><span>Total</span><strong>R$ 1.299,00</strong></div>
+          <button id="payButton" class="primary" type="submit"><span>Simular recusa do pagamento</span><small>A cobrança não será realizada</small></button>
+          <p class="form-foot">🔒 Seus dados são protegidos e não ficam armazenados.</p>
+        </form>
+      </section>
+
+      <aside class="order-card">
+        <h2>Resumo do pedido <span>1 item</span></h2>
+        <div class="product"><div class="phone">◒</div><div><strong>iPhone 13 128GB</strong><p>Excelente · Meia-noite</p><small>12 meses de garantia</small></div><b>R$ 1.299,00</b></div>
+        <div class="totals"><p><span>Subtotal</span><span>R$ 1.299,00</span></p><p><span>Entrega</span><span class="green">Grátis</span></p><p class="grand"><span>Total</span><strong>R$ 1.299,00</strong></p></div>
+        <div class="delivery">⌁ <div><strong>Entrega estimada</strong><span>sexta-feira, 11 de setembro</span></div></div>
+        <div class="trust"><span>✓ Compra segura</span><span>↺ 7 dias para devolver</span><span>♧ Produto revisado</span></div>
+      </aside>
+    </div>
+  </main>
+
+  <button id="chatLauncher" class="chat-launcher"><span>◉</span><span>Precisa de ajuda?<small>Fale com a gente</small></span><b id="chatBadge" class="hidden">1</b></button>
+
+  <div id="recoveryBackdrop" class="backdrop hidden" role="presentation"></div>
+  <section id="recoveryModal" class="recovery-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle">
+    <button class="close" data-close aria-label="Fechar">×</button>
+    <div class="status-icon">!</div>
+    <span class="eyebrow danger">NÃO FOI POSSÍVEL APROVAR O PAGAMENTO</span>
+    <h2 id="recoveryTitle">Seu pedido ainda está reservado</h2>
+    <p class="lead">Não se preocupe: isso pode acontecer por segurança do banco. Você pode tentar novamente ou escolher outra forma de pagamento.</p>
+    <div class="reservation"><span>⏱</span><div><strong>Reserva por mais <b id="countdown">09:58</b></strong><small>O iPhone 13 continua separado para você.</small></div></div>
+    <h3>Escolha a melhor alternativa</h3>
+    <div class="recovery-options">
+      <button data-action="pix"><span class="method-icon pix">◇</span><span><strong>Pagar com Pix</strong><small>Aprovação rápida · copie ou escaneie</small></span><em>15% OFF</em><b>›</b></button>
+      <button data-action="retry"><span class="method-icon card">▣</span><span><strong>Tentar outro cartão</strong><small>Use um cartão diferente ou revise os dados</small></span><b>›</b></button>
+      <button data-action="boleto"><span class="method-icon boleto">▤</span><span><strong>Gerar boleto</strong><small>Vencimento amanhã · confirmação em até 2 dias</small></span><b>›</b></button>
+    </div>
+    <button id="talkNow" class="support-link">◉ Quero ajuda para concluir minha compra</button>
+    <p class="reason">Código da tentativa: <span>51 · transação não autorizada</span></p>
+  </section>
+
+  <aside id="chatPanel" class="chat-panel hidden" aria-label="Assistente de compra">
+    <header><div class="agent">N</div><div><strong>Nina · Assistente de compra</strong><span><i></i> Online agora</span></div><button data-chat-close>×</button></header>
+    <div id="messages" class="messages">
+      <div class="bot-msg">Oi, Rhenan! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir? <time>20:16</time></div>
+      <div class="quick-actions"><button data-chat-action="pix">Quero pagar com Pix</button><button data-chat-action="card">Tentar outro cartão</button><button data-chat-action="human">Falar com uma pessoa</button></div>
+    </div>
+    <form id="chatForm"><input id="chatInput" placeholder="Digite sua mensagem..." aria-label="Mensagem"><button>➤</button></form>
+  </aside>
+
+  <aside id="metricsPanel" class="metrics-panel hidden">
+    <header><div><span class="eyebrow">VALIDAÇÃO DO MVP</span><h2>Eventos da recuperação</h2></div><button data-metrics-close>×</button></header>
+    <p>Esta sessão demonstra os eventos que seriam enviados ao GA4/Clarity ou à sua API.</p>
+    <div class="metric-row"><div><small>RECUSAS</small><strong id="declines">0</strong></div><div><small>RECUPERAÇÕES</small><strong id="recoveries">0</strong></div><div><small>TAXA</small><strong id="rate">0%</strong></div></div>
+    <div class="event-head"><strong>Timeline</strong><button id="clearEvents">Limpar</button></div>
+    <div id="eventLog" class="event-log"><p class="empty">Interaja com o checkout para gerar eventos.</p></div>
+  </aside>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

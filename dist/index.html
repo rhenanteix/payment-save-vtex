@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0D5C3A" />
+  <meta name="description" content="PaySave — VTEX Payment Recovery SaaS. Recover lost sales at checkout automatically." />
+  <title>PaySave — VTEX Payment Recovery SaaS</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="landing-hero">
+    <div class="hero-content">
+      <img src="paysave-logo.png" alt="PaySave Logo" class="hero-logo" />
+      <h1>Rescue your lost sales automatically.</h1>
+      <p>Seamless VTEX IO payment recovery. When a transaction is declined, PaySave instantly offers Pix, Boleto, or another card — saving the order before the customer leaves.</p>
+      <div class="hero-actions">
+        <a href="#demo" class="hero-btn primary-btn">Try the Interactive Demo</a>
+        <a href="https://github.com/vtex-apps" class="hero-btn secondary-btn">View Documentation</a>
+      </div>
+    </div>
+    <div class="hero-background"></div>
+  </div>
+
+  <div id="demo" class="demo-section">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Store"><img src="https://trocafone.vtexassets.com/assets/vtex.file-manager-graphql/images/4fde4f70-8bba-40ef-b6df-9ffd45b5ec25___66a991f457f062abda2484464a9f124a.png" alt="Store"></a>
+      <div class="secure"><span>●</span> Compra 100% segura</div>
+    </header>
+
+    <main class="shell">
+      <nav class="steps" aria-label="Etapas do checkout">
+        <span class="done"><b>✓</b> Identificação</span><i></i>
+        <span class="done"><b>✓</b> Entrega</span><i></i>
+        <span class="active"><b>3</b> Pagamento</span>
+      </nav>
+
+      <section class="prototype-note">
+        <div><span class="pulse"></span><strong>Fase isolada: recusa do pagamento</strong> — o protótipo começa somente quando a VTEX retorna a negativa.</div>
+        <button id="openMetrics" class="text-button">Ver eventos do funil →</button>
+      </section>
+
+      <div class="checkout-grid">
+        <section class="payment-card">
+          <div class="section-heading">
+            <div><span class="eyebrow">ÚLTIMA ETAPA</span><h2>Como você quer pagar?</h2></div>
+            <span class="order-id">Pedido #9821213</span>
+          </div>
+
+          <div class="payment-tabs">
+            <button class="tab" data-method="pix">Pix</button>
+            <button class="tab active" data-method="card">Cartão de crédito</button>
+            <button class="tab" data-method="boleto">Boleto</button>
+          </div>
+
+          <form id="paymentForm" class="payment-form">
+            <div id="cardFields">
+              <label>Número do cartão
+                <div class="input-wrap">
+                  <input type="text" value="**** **** **** 4123" readonly>
+                  <span>VISA</span>
+                </div>
+              </label>
+              <div class="row">
+                <label>Validade <input type="text" value="12/28" readonly></label>
+                <label>CVV <input type="password" value="***" readonly></label>
+              </div>
+              <label>Nome impresso no cartão <input type="text" value="RHENAN S SILVA" readonly></label>
+              <label>Parcelas <select disabled><option>1x de R$ 2.450,00 sem juros</option></select></label>
+            </div>
+            <div id="altMethod" class="alt-method hidden"></div>
+            <div class="summary-line"><span>Total a pagar</span><strong>R$ 2.450,00</strong></div>
+            <button id="payButton" class="primary" type="submit"><span>Simular recusa do pagamento</span><small>Finalizar compra</small></button>
+            <p class="form-foot">Ao clicar, a VTEX enviará a transação. Neste demo, forçaremos o erro.</p>
+          </form>
+        </section>
+
+        <section class="order-card">
+          <h2>Resumo da compra <span>2 itens</span></h2>
+          <div class="product">
+            <div class="phone">📱</div>
+            <div>
+              <strong>iPhone 13 Pro 128GB Grafite</strong>
+              <p>Vendido e entregue por Trocafone</p>
+              <small>Condição: Excelente</small>
+            </div>
+            <b>R$ 2.390,00</b>
+          </div>
+          <div class="totals">
+            <p><span>Subtotal</span><span>R$ 2.390,00</span></p>
+            <p><span>Frete</span><span class="green">Grátis</span></p>
+            <p class="grand"><span>Total</span><strong>R$ 2.390,00</strong></p>
+          </div>
+          <div class="delivery">
+            <div><strong>Entrega Expressa</strong><span>Até 2 dias úteis</span></div>
+          </div>
+          <div class="trust">
+            <span>🔒 SSL Criptografado</span>
+            <span>✓ Garantia 90 dias</span>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <button id="chatLauncher" class="chat-launcher hidden" aria-label="Abrir assistente">
+    <span>N</span>
+    <span><strong>Assistente PaySave</strong><small>Online</small></span>
+    <b id="chatBadge" class="hidden">1</b>
+  </button>
+
+  <div id="recoveryBackdrop" class="backdrop hidden"></div>
+
+  <section id="recoveryModal" class="recovery-modal hidden" role="dialog" aria-modal="true">
+    <button id="closeModal" class="close" data-close aria-label="Fechar">×</button>
+    <div class="status-icon">!</div>
+    <span class="eyebrow danger">PAGAMENTO NÃO APROVADO</span>
+    <h2>O cartão final 4123 foi recusado pelo emissor.</h2>
+    <p class="lead">Mas não se preocupe! Seu pedido <strong class="danger">não foi cancelado</strong>. Você ainda pode garantir seus produtos escolhendo outra forma de pagamento abaixo.</p>
+    
+    <div class="reservation">
+      <div><strong>Itens reservados por 10:00</strong><small>Garanta seu iPhone 13 Pro agora mesmo.</small></div>
+    </div>
+
+    <h3>Escolha como deseja concluir:</h3>
+    <div class="recovery-options">
+      <button data-action="pix">
+        <div class="method-icon pix">❖</div>
+        <span><strong>Pagar com Pix</strong><small>Aprovação imediata (15% OFF)</small></span>
+        <em>RECOMENDADO</em>
+        <div>›</div>
+      </button>
+      <button data-action="retry">
+        <div class="method-icon card">💳</div>
+        <span><strong>Tentar outro cartão</strong><small>Use um cartão diferente</small></span>
+        <div>›</div>
+      </button>
+      <button data-action="boleto">
+        <div class="method-icon boleto">📄</div>
+        <span><strong>Gerar boleto</strong><small>Vence em 2 dias úteis</small></span>
+        <div>›</div>
+      </button>
+    </div>
+
+    <button id="talkNow" class="support-link">Não reconhece o erro? Quero ajuda para concluir minha compra</button>
+    <p class="reason">Código da tentativa: <span>51 · transação não autorizada</span></p>
+  </section>
+
+  <aside id="chatPanel" class="chat-panel hidden" aria-label="Assistente de compra">
+    <header>
+      <div class="agent">N</div>
+      <div><strong>Nina · Assistente de compra</strong><span><i></i> Online agora</span></div>
+      <button data-chat-close>×</button>
+    </header>
+    <div id="messages" class="messages">
+      <div class="bot-msg">Oi! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir? <time>agora</time></div>
+      <div class="quick-actions">
+        <button data-chat-action="pix">Quero pagar com Pix</button>
+        <button data-chat-action="card">Tentar outro cartão</button>
+        <button data-chat-action="human">Falar com uma pessoa</button>
+      </div>
+    </div>
+    <form id="chatForm">
+      <input id="chatInput" placeholder="Digite sua mensagem..." aria-label="Mensagem">
+      <button>➤</button>
+    </form>
+  </aside>
+
+  <aside id="metricsPanel" class="metrics-panel hidden">
+    <header>
+      <div><span class="eyebrow">VALIDAÇÃO DO MVP</span><h2>Eventos da recuperação</h2></div>
+      <button data-metrics-close>×</button>
+    </header>
+    <p>Esta sessão demonstra os eventos que seriam enviados ao GA4/Clarity ou à sua API.</p>
+    <div class="metric-row">
+      <div><small>RECUSAS</small><strong id="declines">0</strong></div>
+      <div><small>RECUPERAÇÕES</small><strong id="recoveries">0</strong></div>
+      <div><small>TAXA</small><strong id="rate">0%</strong></div>
+    </div>
+    <div class="event-head">
+      <strong>Timeline</strong>
+      <button id="clearEvents">Limpar</button>
+    </div>
+    <div id="eventLog" class="event-log">
+      <p class="empty">Interaja com o checkout para gerar eventos.</p>
+    </div>
+  </aside>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
