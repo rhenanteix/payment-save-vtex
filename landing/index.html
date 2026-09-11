@@ -14,7 +14,7 @@
     <main>
       <nav class="nav" aria-label="Navegação principal">
         <a class="brand" href="#inicio">paysave<span>.</span></a>
-        <a class="nav-link" href="../docs/index.mdx">Documentação</a>
+        <a class="nav-link" data-doc-path="/" href="https://rhenanteix.github.io/payment-save-vtex/">Documentação</a>
       </nav>
 
       <section id="inicio" class="hero">
@@ -23,8 +23,8 @@
           <h1>PaySave</h1>
           <p class="hero-lead">Recupere clientes após uma recusa de pagamento, dentro do Checkout que eles já conhecem.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="../docs/installation.mdx">Instalar no Checkout</a>
-            <a class="button button-secondary" href="../docs/validation.mdx">Ver validação</a>
+            <a class="button button-primary" data-doc-path="/installation" href="https://rhenanteix.github.io/payment-save-vtex/installation">Instalar no Checkout</a>
+            <a class="button button-secondary" data-doc-path="/validation" href="https://rhenanteix.github.io/payment-save-vtex/validation">Ver validação</a>
           </div>
           <p class="command">vtex install FORNECEDOR.paysave@1.x</p>
         </div>
@@ -58,6 +58,27 @@
           <p>Envia eventos para <code>window.dataLayer</code>.</p>
         </div>
       </section>
+
+      <section class="evolution" aria-label="Evolução do PaySave">
+        <div class="evolution-intro">
+          <p class="eyebrow">Evolução contínua</p>
+          <h2>Mais caminhos para recuperar uma compra.</h2>
+          <p>O PaySave segue a configuração e os meios nativos de cada loja, sem assumir o processamento do pagamento.</p>
+        </div>
+        <div class="evolution-grid">
+          <article><span>01</span><h3>Dois cartões</h3><p>Encaminha para o split payment nativo quando a loja disponibiliza essa opção.</p></article>
+          <article><span>02</span><h3>Atendimento conectado</h3><p>Transfira o cliente para WhatsApp, CRM ou chat humano com o contexto da compra.</p></article>
+          <article><span>03</span><h3>Recuperação pós-saída</h3><p>Dispare e-mail ou automação depois do abandono, usando uma API segura do parceiro.</p></article>
+          <article><span>04</span><h3>Experimentos</h3><p>Compare a ordem de meios, mensagens e incentivos para encontrar o melhor fluxo.</p></article>
+        </div>
+      </section>
     </main>
+    <script>
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        document.querySelectorAll('[data-doc-path]').forEach(function (link) {
+          link.href = 'http://localhost:3000/payment-save-vtex' + link.dataset.docPath
+        })
+      }
+    </script>
   </body>
 </html>

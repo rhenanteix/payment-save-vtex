@@ -7,12 +7,24 @@ Modal de recuperação de vendas para o **Checkout v6 da VTEX**. Quando uma tran
 
 ## Material para parceiros
 
-- [Portal Mintlify da documentação](docs/)
-- [Instalação do PaySave](docs/installation.mdx)
-- [Validação antes da produção](docs/validation.mdx)
+- [Portal Docusaurus](website/docs/introduction.md)
+- [Instalação do PaySave](website/docs/installation.md)
+- [Validação antes da produção](website/docs/validation.md)
 - [Landing page do produto](landing/index.html)
 
-### Publicar o portal Mintlify
+### Executar a documentação Docusaurus
+
+O portal fica em `website/` e contém o manual completo de instalação, configuração, validação, eventos, atendimento, API de recuperação, dois cartões e checklist de produção.
+
+```bash
+npm install --prefix website
+npm run docs:docusaurus
+npm run docs:docusaurus:build
+```
+
+O comando de build gera os arquivos estáticos em `website/build/`. O workflow [deploy-docs.yml](.github/workflows/deploy-docs.yml) publica esse conteúdo em `https://rhenanteix.github.io/payment-save-vtex/` após um push na branch `main`. A ativação inicial de GitHub Pages está detalhada em [Landing e portal](website/docs/landing-integration.md).
+
+### Material Mintlify legado
 
 O portal fonte está em `docs/`, com configuração em `docs/docs.json`. Para conectá-lo ao Mintlify, crie ou acesse a organização em `app.mintlify.com`, conecte este repositório e selecione a pasta `docs` como raiz da documentação. Após a autorização, use:
 
@@ -76,16 +88,45 @@ O PaySave é uma camada de recuperação. Ele nunca autoriza, captura ou cancela
 ### Funcionalidades disponíveis
 
 - Modal de recuperação sobre o Checkout nativo, sem remover a mensagem original da VTEX.
-- Métodos renderizados do `orderForm`: Pix, Pagaleve, Nubank e uma opção de cartão na Trocafone; fallback configurável para outras contas.
+- Métodos renderizados do `orderForm`: Pix, Pagaleve, Nubank e uma opção de cartão quando esses grupos estiverem habilitados; fallback configurável para cada parceiro.
 - Ícones oficiais usados pelo Checkout VTEX para os métodos reconhecidos.
 - Chat de suporte, respostas rápidas e painel de métricas da sessão no workspace de desenvolvimento.
 - Eventos `dataLayer` para acompanhar recusa, visualização, seleção de método e recuperação.
 - Modo controlado `?cr-debug=1` para abrir o modal no Checkout de uma workspace, sem tentativa de cobrança.
 - Feature flag `enabled` para interrupção imediata em uma nova versão do app.
+- Split payment opcional: encaminha para a opção nativa de dois cartões do Checkout, quando habilitada pela loja.
 
 ---
 
 ## Instalação para parceiros
+
+## Plano de início gradual
+
+O PaySave deve começar como distribuição privada para um parceiro piloto. A App Store VTEX fica para a etapa em que a configuração for autônoma e o suporte estiver definido.
+
+### Fase 1: piloto controlado
+
+1. Crie uma versão de piloto com `enabled: false` no objeto `S`. A configuração-base do repositório permanece habilitada para preservar o comportamento exercitado pela suíte de testes.
+2. Escolha uma única conta parceira e crie uma workspace exclusiva, como `paysave-piloto`.
+3. Configure apenas métodos já habilitados no Checkout dessa conta.
+4. Valide com `?cr-debug=1`, depois com a recusa de homologação aprovada pelo gateway.
+5. Confira os eventos `paysave_*`, erros do navegador e o encaminhamento para cada meio nativo.
+
+### Fase 2: janela de produção
+
+1. Publique a versão com o modal desativado.
+2. Altere apenas `enabled` para `true` e publique uma nova versão.
+3. Instale-a em horário de baixo tráfego e acompanhe recusa, abertura, seleção e recuperação pelo analytics.
+4. Para interromper, reinstale a versão anterior ou publique imediatamente outra versão com `enabled: false`.
+
+### Fase 3: distribuição para parceiros
+
+1. Crie ou use o vendor VTEX IO da empresa fornecedora.
+2. Altere `vendor` em `manifest.json` antes da publicação definitiva.
+3. Publique o ID final, por exemplo `FORNECEDOR.paysave@1.x`.
+4. Cada parceiro instala a versão publicada com o Toolbelt; não executa comandos dentro da página de Checkout.
+
+O diagrama e os comandos detalhados ficam no [guia visual de instalação](website/docs/visual-installation.md).
 
 ### Pré-requisitos
 
@@ -97,18 +138,35 @@ npm install -g vtex   # instala o VTEX Toolbelt (uma vez)
 
 ```bash
 vtex login NOME-DA-CONTA
-vtex install trocafone.paysave@1.x
+vtex install FORNECEDOR.paysave@1.x
 ```
 
 ### 2. Configurar o template do Checkout
 
-A Edition ativa da Trocafone não suporta o builder `pixel`. O app usa o builder oficial `checkout-ui-custom`, que publica scripts versionados para o template. Altere o objeto `S` em `checkout-ui-custom/checkout6-custom.js` para mudar nome do chat, textos, métodos, seletores e feature flag. As cores ficam em `checkout-ui-custom/checkout6-custom.css`. Depois execute `vtex link --no-watch` no workspace de desenvolvimento.
+O app usa o builder oficial `checkout-ui-custom`, que publica scripts versionados para o template. Altere o objeto `S` em `checkout-ui-custom/checkout6-custom.js` para mudar nome do chat, textos, métodos, seletores e feature flag. As cores ficam em `checkout-ui-custom/checkout6-custom.css`. Depois execute `vtex link --no-watch` no workspace de desenvolvimento.
 
 As mudanças ficam versionadas no app e podem ser revertidas ao instalar a versão anterior. Uma tela no Admin para edição sem novo link exigirá um segundo app administrativo e uma API pública de configurações; o template de Checkout não fornece `settingsSchema` diretamente ao browser.
 
+### Personalizar chat e atendimento
+
+O parceiro configura aparência e comunicação no objeto `S`. As cores padrão do piloto usam rosa, azul e tons claros para acompanhar a identidade visual de teste atual; substitua pelos valores da marca do parceiro antes de publicar.
+
+```js
+assistantName: 'Equipe da Loja',
+chatGreeting: 'Posso ajudar você a concluir esta compra.',
+chatPaymentTitle: 'Escolha outra forma de pagamento',
+chatHumanLabel: 'Falar com nossa equipe',
+chatHumanUrl: 'https://wa.me/5511999999999?text=Preciso%20de%20ajuda',
+primaryColor: '#e50046',
+primaryLightColor: '#fff0f4',
+accentColor: '#004e70',
+```
+
+`chatHumanUrl` pode ser uma URL de WhatsApp, Zendesk, CRM, central de ajuda ou qualquer outro canal externo que comece com `https://` ou `http://`. O botão abre o destino em nova aba. O chat não envia dados de cartão, CVV ou token para esse canal.
+
 ### Métodos de pagamento e outras empresas
 
-Quando o Checkout informa `orderForm.paymentData.paymentSystems`, o modal monta suas opções a partir desses grupos. Na configuração atual da Trocafone, ele apresenta Pix, Pagaleve Pix Mensal Transparente, Nubank e uma única opção de cartão de crédito, mesmo quando existem várias bandeiras. O botão selecionado sempre clica no grupo nativo correspondente do Checkout. Boleto não é incluído.
+Quando o Checkout informa `orderForm.paymentData.paymentSystems`, o modal monta suas opções a partir desses grupos. A configuração padrão reconhece Pix, Pagaleve, Nubank e uma única opção de cartão de crédito, mesmo quando existem várias bandeiras. O botão selecionado sempre clica no grupo nativo correspondente do Checkout. Boleto não é incluído.
 
 Para uma conta que não exponha esses grupos reconhecidos, `S.paymentMethods` aceita uma lista JSON de fallback. Cada item usa o `selector` da opção já existente no Checkout v6 da conta; por isso o app não cria nem tenta processar meios de pagamento.
 
@@ -133,7 +191,18 @@ Para uma conta que não exponha esses grupos reconhecidos, `S.paymentMethods` ac
 
 Confirme o seletor na página de pagamento de cada loja antes de publicar a configuração.
 
-Para identificar o seletor, abra o Checkout da conta em um workspace de desenvolvimento e inspecione o botão do método de pagamento nativo. Na Trocafone, os grupos reais são `#payment-group-instantPaymentPaymentGroup`, `#payment-group-Pagaleve Pix Mensal TransparentePaymentGroup`, `#payment-group-NubankPaymentGroup` e `#payment-group-creditCardPaymentGroup`. Mantenha o seletor alternativo somente quando outra implementação de Checkout usar `data-payment-group`.
+Para identificar o seletor, abra o Checkout da conta em um workspace de desenvolvimento e inspecione o botão do método de pagamento nativo. Os grupos podem ser acessados pelo padrão `#payment-group-NOME_DO_GRUPO`. Mantenha o seletor alternativo somente quando a implementação de Checkout usar `data-payment-group`.
+
+### Split payment com dois cartões
+
+O PaySave não coleta nem divide valores de cartão. Quando a loja já possui o split payment habilitado no Checkout VTEX, habilite a alternativa no objeto `S` e informe o seletor do controle nativo que adiciona o segundo cartão:
+
+```js
+enableSplitPayment: true,
+splitPaymentSelector: '.SELETOR-DO-CONTROLE-NATIVO',
+```
+
+Ao escolher **Pagar com dois cartões**, o PaySave abre o grupo nativo de cartão e aciona o controle informado. Valide o seletor em uma workspace antes de publicar. Em contas sem esse recurso nativo, mantenha `enableSplitPayment: false`; o PaySave não exibirá essa alternativa.
 
 ---
 
@@ -156,16 +225,16 @@ Acesse `https://paysave-test--NOME-DA-CONTA.myvtex.com/checkout?cr-debug=1`. O p
 3. Verifique no DevTools que os eventos `paysave_*` chegam ao `window.dataLayer`.
 4. Teste uma recusa apenas com o método de homologação autorizado pelo adquirente ou gateway da conta. Não use cartão real nem provoque recusas em pedidos de clientes.
 
-O app está validado para recusas em `orderFormUpdated.vtex` (`denied`, `voided` ou `cancelled`), `transactionValidation.vtex` (`status: denied`), erros HTTP de transação e respostas $2xx$ cujo corpo contenha a recusa do gateway. Ele também reconhece o aviso nativo VTEX/Tuna com `status:denied` como última proteção. A recusa financeira real depende do cartão de teste homologado pelo gateway ativo na conta; peça esse dado ao responsável por pagamentos da Trocafone antes de finalizar um pedido de teste.
+O app está validado para recusas em `orderFormUpdated.vtex` (`denied`, `voided` ou `cancelled`), `transactionValidation.vtex` (`status: denied`), erros HTTP de transação e respostas $2xx$ cujo corpo contenha a recusa do gateway. Ele também reconhece o aviso nativo VTEX com `status:denied` como última proteção. A recusa financeira real depende do cartão de teste homologado pelo gateway ativo na conta; peça esse dado ao responsável por pagamentos do parceiro antes de finalizar um pedido de teste.
 
 ### Ativar em produção
 
-Depois da validação no workspace, publique uma versão com o vendor VTEX IO da organização. Este projeto está configurado com `trocafone`, conforme a conta VTEX ativa.
+Depois da validação no workspace, publique uma versão com o vendor VTEX IO da organização. Antes de distribuir para outros parceiros, substitua o `vendor` em `manifest.json` pelo vendor da organização que publicará o app.
 
 ```bash
 vtex publish
 vtex deploy
-vtex install trocafone.paysave@1.x
+vtex install FORNECEDOR.paysave@1.x
 ```
 
 Antes de ativar, mantenha `enabled: false` no objeto `S`, faça a validação no workspace e publique essa versão. Para iniciar o experimento, altere para `enabled: true`, publique uma nova versão e instale-a em uma janela de baixo tráfego. Para interromper o experimento, reinstale a versão anterior ou publique imediatamente uma versão com `enabled: false`.
@@ -223,9 +292,12 @@ npx serve dist
 
 ---
 
-## Próximos passos sugeridos
+## Próximas evoluções
 
-- [ ] Integrar com a API de Orders da VTEX para enviar e-mail de recuperação
-- [ ] Adicionar suporte a split payment (dois cartões)
-- [ ] Criar webhook para notificar o parceiro sobre recuperações
-- [ ] A/B test entre variantes do modal via settings
+- [x] Piloto privado com feature flag `enabled` desativada por padrão.
+- [x] Split payment nativo opcional, mantido desativado até validação do parceiro.
+- [ ] Criar app administrativo VTEX para configurar textos, cores, meios e integrações sem editar código.
+- [ ] Criar API de recuperação para e-mail, CRM ou WhatsApp com segurança, idempotência e conformidade LGPD.
+- [ ] Criar webhook para notificar o parceiro sobre recuperações.
+- [ ] Adicionar variantes A/B configuráveis e relatório de conversão por meio escolhido.
+- [ ] Preparar cadastro e aprovação para VTEX App Store após a configuração autônoma e o suporte operacional estarem prontos.

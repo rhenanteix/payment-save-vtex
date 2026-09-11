@@ -61,20 +61,27 @@
       reservationMinutes: 10,
       showPixDiscount: false,
       pixDiscountLabel: '15% OFF',
-      assistantName: 'Nina',
+      assistantName: 'Trocafone Chat',
       modalEyebrow: 'NÃO FOI POSSÍVEL APROVAR O PAGAMENTO',
       modalTitle: 'Seu pedido ainda está reservado',
       modalDescription: 'Não se preocupe: isso pode acontecer por segurança do banco. Você pode tentar novamente ou escolher outra forma de pagamento.',
       optionsTitle: 'Escolha a melhor alternativa',
       supportText: 'Quero ajuda para concluir minha compra',
       chatGreeting: 'Olá! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir?',
+      chatPaymentTitle: 'Como prefere continuar?',
+      chatHumanLabel: 'Falar com o atendimento',
+      chatHumanUrl: '',
+      chatHumanMessage: 'Posso conectar você ao atendimento da loja para continuar por outro canal.',
       launcherTitle: 'Precisa de ajuda?',
       launcherSubtitle: 'Fale com a gente',
-      primaryColor: '#086b4d',
-      primaryLightColor: '#dff3eb',
-      accentColor: '#ff8800',
+      primaryColor: '#e50046',
+      primaryLightColor: '#fff0f4',
+      accentColor: '#004e70',
       paymentMethods: DEFAULT_PAYMENT_METHODS,
+      enableSplitPayment: false,
+      splitPaymentSelector: '[data-testid="split-payment"], [data-payment-action="split-payment"], .add-payment',
       sendAnalytics: true,
+      hideNativeDeclineMessage: true,
     },
     window.__cr_settings || {}
   )
@@ -85,7 +92,8 @@
    * 3. ESTADO INTERNO
    * ────────────────────────────────────────────────────────────────────*/
   var state = {
-    modalShownForTransaction: null, // evita exibir duas vezes na mesma tentativa
+    handledDeclines: {}, // cada tentativa recusada abre o modal apenas uma vez
+    lastNativeDeclineKey: null,
     events: [],
     declines: 0,
     recoveries: 0,
@@ -203,7 +211,38 @@
       }
     })
 
+    if (S.enableSplitPayment && groups.creditCardPaymentGroup) {
+      methods.push({
+        id: 'split-card',
+        label: 'Pagar com dois cartões',
+        description: 'Divida o valor entre dois cartões de crédito',
+        toast: 'Informe os valores e os dados dos dois cartões',
+        iconClass: 'cr-card',
+        groupName: 'creditCardPaymentGroup',
+        afterSelect: S.splitPaymentSelector,
+        icon: '<img class="cr-logo-vtex cr-logo-card" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/ico-credit2.png" alt="">',
+      })
+    }
+
     return methods.length ? methods : getConfiguredPaymentMethods()
+  }
+
+  function chatPaymentOptionsHtml(orderForm) {
+    return getPaymentMethods(orderForm)
+      .map(function (method) {
+        return [
+          '<button class="cr-chat-method" data-cr-chat-method="' + escapeHtml(method.id) + '">',
+          '  <span class="cr-method-icon ' + escapeHtml(method.iconClass || 'cr-card') + '">' + (method.icon || '') + '</span>',
+          '  <span><strong>' + escapeHtml(method.label) + '</strong><small>' + escapeHtml(method.description || '') + '</small></span>',
+          '  <b>&#8250;</b>',
+          '</button>',
+        ].join('')
+      })
+      .join('')
+  }
+
+  function isExternalSupportUrl(value) {
+    return /^https?:\/\//i.test(String(value || '').trim())
   }
 
   function getConfiguredPaymentMethods() {
@@ -309,17 +348,76 @@
     return /status\s*[":=]+\s*"?denied|não foi possível aprovar sua compra|nao foi possivel aprovar sua compra/i.test(response)
   }
 
-  function openGatewayRecovery(source) {
+  function getDeclineKey(value, fallback) {
+    var text = typeof value === 'string' ? value : JSON.stringify(value || {})
+    var match = text.match(/(?:transactionId|paymentId|tid)\s*[":=]+\s*"?([a-z0-9-]+)/i)
+    return match ? match[1].toLowerCase() : fallback
+  }
+
+  function hideNativeDeclineMessage() {
+    if (!S.hideNativeDeclineMessage) return
+
+    var markers = [
+      'por favor, revise seus dados de pagamento',
+      'não foi possível aprovar sua compra',
+      'nao foi possivel aprovar sua compra',
+    ]
+    var candidates = qsa('body *').filter(function (element) {
+      if (element.closest('#cr-root')) return false
+      var text = (element.textContent || '').toLowerCase()
+      return markers.some(function (marker) {
+        return text.indexOf(marker) !== -1
+      })
+    })
+
+    candidates.forEach(function (element) {
+      var container = element
+      while (container && container !== document.body) {
+        var className = typeof container.className === 'string'
+          ? container.className
+          : ''
+        var role = container.getAttribute && container.getAttribute('role')
+        if (
+          role === 'dialog' ||
+          role === 'alertdialog' ||
+          /(?:^|[-_\s])(modal|alert|error|notification)(?:[-_\s]|$)/i.test(className)
+        ) {
+          break
+        }
+        container = container.parentElement
+      }
+
+      ;(container && container !== document.body ? container : element)
+        .classList.add('cr-vtex-decline-hidden')
+    })
+
+    // O Checkout pode manter o backdrop do alerta nativo no body mesmo depois
+    // que a caixa de recusa foi ocultada. Sem removê-lo, a página fica bloqueada.
+    if (candidates.length) {
+      qsa('.modal-backdrop, .vtex-modal-backdrop, [data-testid="modal-backdrop"]')
+        .filter(function (element) { return !element.closest('#cr-root') })
+        .forEach(function (element) {
+          element.classList.add('cr-vtex-decline-hidden')
+        })
+    }
+  }
+
+  function openDeclineRecovery(key, source, orderForm) {
+    if (state.handledDeclines[key]) return
+
     var modal = qs('#cr-modal')
     if (modal && !modal.classList.contains('cr-hidden')) return
 
-    var now = Date.now()
-    if (state.lastGatewayDeclineAt && now - state.lastGatewayDeclineAt < 3000) return
-
-    state.lastGatewayDeclineAt = now
+    state.handledDeclines[key] = true
     state.declines++
     pushEvent('payment_declined', { source: source })
-    openModal(state.currentOrderForm)
+    openModal(orderForm || state.currentOrderForm)
+    hideNativeDeclineMessage()
+  }
+
+  function openGatewayRecovery(source, response) {
+    var key = getDeclineKey(response, source)
+    openDeclineRecovery(key, source)
   }
 
   /* ────────────────────────────────────────────────────────────────────
@@ -392,10 +490,12 @@
       '      ' + escapeHtml(S.chatGreeting),
       '      <time>agora</time>',
       '    </div>',
+      '    <div class="cr-chat-payment-actions">',
+      '      <p>' + escapeHtml(S.chatPaymentTitle) + '</p>',
+      '      <div id="cr-chat-payment-options">' + chatPaymentOptionsHtml() + '</div>',
+      '    </div>',
       '    <div class="cr-quick-actions">',
-      '      <button data-cr-chat-action="pix">Quero pagar com Pix</button>',
-      '      <button data-cr-chat-action="card">Tentar outro cartão</button>',
-      '      <button data-cr-chat-action="human">Falar com uma pessoa</button>',
+      '      <button data-cr-chat-action="human">' + escapeHtml(S.chatHumanLabel) + '</button>',
       '    </div>',
       '  </div>',
       '  <form id="cr-chat-form">',
@@ -463,6 +563,13 @@
     bindPaymentOptionEvents()
   }
 
+  function renderChatPaymentOptions(orderForm) {
+    var options = qs('#cr-chat-payment-options')
+    if (!options) return
+    options.innerHTML = chatPaymentOptionsHtml(orderForm)
+    bindChatPaymentEvents()
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 7. ABRIR / FECHAR MODAL
    * ────────────────────────────────────────────────────────────────────*/
@@ -478,6 +585,7 @@
     if (orderForm) {
       state.currentOrderForm = orderForm
       renderPaymentOptions(orderForm)
+      renderChatPaymentOptions(orderForm)
       var items = (orderForm.items || [])
       var firstName = ''
       try {
@@ -563,6 +671,10 @@
     if (tab) {
       tab.click()
       setTimeout(function () {
+        if (method && method.afterSelect) {
+          var splitControl = qs(method.afterSelect)
+          if (splitControl) splitControl.click()
+        }
         // Scroll para o formulário de pagamento
         var form = qs('#payment-data') || qs('.payment-option')
         if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -581,6 +693,9 @@
    * ────────────────────────────────────────────────────────────────────*/
   function openChat() {
     closeModal()
+    renderChatPaymentOptions(
+      state.currentOrderForm || (((window.vtexjs || {}).checkout || {}).orderForm || null)
+    )
     var chat = qs('#cr-chat')
     var launcher = qs('#cr-launcher')
     var badge = qs('#cr-badge')
@@ -598,6 +713,15 @@
     div.innerHTML = text + '<time>agora</time>'
     msgs.appendChild(div)
     msgs.scrollTop = msgs.scrollHeight
+  }
+
+  function openExternalSupport() {
+    if (!isExternalSupportUrl(S.chatHumanUrl)) {
+      botReply(S.chatHumanMessage)
+      return
+    }
+    pushEvent('external_support_open', { channel: 'external' })
+    window.open(S.chatHumanUrl, '_blank', 'noopener,noreferrer')
   }
 
   /* ────────────────────────────────────────────────────────────────────
@@ -661,22 +785,12 @@
         if (launcher) launcher.classList.remove('cr-hidden')
       })
 
-    // Quick replies do chat
+    // Opções de atendimento do chat
     qsa('[data-cr-chat-action]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var action = btn.getAttribute('data-cr-chat-action')
         pushEvent('chat_quick_reply', { reply: action })
-        if (action === 'pix') {
-          botReply('Perfeito! Vou selecionar Pix para você. Clique no método Pix para confirmar.')
-          recover('pix')
-          state.recoveries++
-          renderMetrics()
-        } else if (action === 'card') {
-          botReply('Sem problema. Informe os dados do outro cartão. Seu pedido continua reservado.')
-          recover('retry')
-        } else {
-          botReply('Certo! Estou chamando alguém do nosso time. Tempo médio de resposta: 1 minuto.')
-        }
+        if (action === 'human') openExternalSupport()
       })
     })
 
@@ -725,6 +839,18 @@
     })
   }
 
+  function bindChatPaymentEvents() {
+    qsa('[data-cr-chat-method]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.getAttribute('data-cr-chat-method')
+        var method = getPaymentMethod(action)
+        pushEvent('chat_payment_option_selected', { option: action })
+        botReply('Perfeito. Vou abrir ' + escapeHtml((method || {}).label || 'essa forma de pagamento') + ' para você.')
+        recover(action)
+      })
+    })
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 13. ESCUTA DE EVENTOS NATIVOS DO CHECKOUT V6
    * ────────────────────────────────────────────────────────────────────*/
@@ -747,16 +873,12 @@
           if (txs && txs.length > 0) txId = txs[0].transactionId
         } catch (e) {}
 
-        if (txId && txId === state.modalShownForTransaction) return
-
         if (isPaymentDenied(orderForm)) {
-          state.declines++
-          state.modalShownForTransaction = txId
-          pushEvent('payment_declined', {
-            method: 'creditCard',
-            order_form_id: orderForm.orderFormId || 'unknown',
-          })
-          openModal(orderForm)
+          openDeclineRecovery(
+            txId || 'orderform:' + (orderForm.orderFormId || 'unknown'),
+            'orderFormUpdated',
+            orderForm
+          )
         }
       }
     )
@@ -766,9 +888,10 @@
       'transactionValidation.vtex',
       function (evt, data) {
         if (data && data.status === 'denied') {
-          state.declines++
-          pushEvent('payment_declined', { source: 'transactionValidation' })
-          openModal(state.currentOrderForm)
+          openDeclineRecovery(
+            getDeclineKey(data, 'transactionValidation'),
+            'transactionValidation'
+          )
         }
       }
     )
@@ -779,14 +902,16 @@
       var isPaymentRequest = /transaction|payment/.test(requestUrl)
       var isRequestFailure = status >= 400 && status < 600
 
-      if (isPaymentRequest && isRequestFailure) openGatewayRecovery('checkout_ajax_error')
+      if (isPaymentRequest && isRequestFailure) {
+        openGatewayRecovery('checkout_ajax_error', jqXHR)
+      }
     })
 
     // Gateways como a Tuna podem responder 200 e informar a recusa no corpo.
     checkoutJQuery(document).ajaxComplete(function (evt, jqXHR, ajaxSettings) {
       var requestUrl = ((ajaxSettings || {}).url || '').toLowerCase()
       if (/transaction|payment/.test(requestUrl) && responseIndicatesDenial(jqXHR)) {
-        openGatewayRecovery('checkout_transaction_response')
+        openGatewayRecovery('checkout_transaction_response', jqXHR)
       }
     })
 
@@ -794,8 +919,17 @@
     // evento do orderForm chega ao script de customização.
     if (window.MutationObserver && document.body) {
       var nativeDeclineObserver = new window.MutationObserver(function () {
-        if (/status\s*:\s*denied/i.test(document.body.textContent || '')) {
-          openGatewayRecovery('checkout_native_denial_message')
+        var pageText = document.body.textContent || ''
+        if (/status\s*:\s*denied/i.test(pageText)) {
+          hideNativeDeclineMessage()
+          var nativeDeclineKey = getDeclineKey(
+            pageText,
+            'checkout_native_denial_message'
+          )
+          if (nativeDeclineKey === state.lastNativeDeclineKey) return
+
+          state.lastNativeDeclineKey = nativeDeclineKey
+          openDeclineRecovery(nativeDeclineKey, 'checkout_native_denial_message')
         }
       })
       nativeDeclineObserver.observe(document.body, { childList: true, subtree: true })
@@ -816,6 +950,10 @@
     }
   }
 
+  function isDebugMode() {
+    return /(?:[?#&])cr-debug=1(?:[&#]|$)/.test(window.location.href)
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 14. INICIALIZAÇÃO
    * ────────────────────────────────────────────────────────────────────*/
@@ -824,10 +962,7 @@
     waitForjQuery(bindCheckoutEvents)
     pushEvent('paysave_loaded', { version: '1.0.0' })
 
-    if (
-      isDevWorkspace &&
-      new URLSearchParams(window.location.search).get('cr-debug') === '1'
-    ) {
+    if (isDevWorkspace && isDebugMode()) {
       openModal()
     }
 
@@ -837,13 +972,18 @@
       var metricsBtn = document.createElement('button')
       metricsBtn.id = 'cr-metrics-trigger'
       metricsBtn.className = 'cr-metrics-trigger'
-      metricsBtn.setAttribute('aria-label', 'Abrir painel PaySave')
+      metricsBtn.setAttribute('aria-label', 'Abrir painel ou simular recusa PaySave')
       metricsBtn.innerHTML = '&#9660; PaySave'
       metricsBtn.addEventListener('click', function () {
-        var panel = qs('#cr-metrics')
-        if (panel) {
-          panel.classList.toggle('cr-hidden')
-          renderMetrics()
+        var modal = qs('#cr-modal')
+        if (modal && modal.classList.contains('cr-hidden')) {
+          openDeclineRecovery('manual_workspace_test:' + Date.now(), 'manual_workspace_test')
+        } else {
+          var panel = qs('#cr-metrics')
+          if (panel) {
+            panel.classList.toggle('cr-hidden')
+            renderMetrics()
+          }
         }
       })
       document.body.appendChild(metricsBtn)

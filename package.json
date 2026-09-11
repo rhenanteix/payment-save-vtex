@@ -8,6 +8,8 @@
     "test:watch": "vitest",
     "presentation": "npx serve dist/presentation",
     "landing": "npx serve landing",
+    "docs:docusaurus": "npm --prefix website run start",
+    "docs:docusaurus:build": "npm --prefix website run build",
     "docs:dev": "cd docs && mint dev --no-open --port 3000",
     "docs:validate": "cd docs && mint validate",
     "docs:links": "cd docs && mint broken-links"

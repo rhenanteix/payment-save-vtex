@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -74,6 +74,7 @@ describe('PaySave', () => {
       expect(document.querySelector('#cr-launcher')).not.toBeNull()
       expect(document.querySelector('#cr-metrics')).not.toBeNull()
     })
+
   })
 
   describe('settings', () => {
@@ -119,6 +120,22 @@ describe('PaySave', () => {
       expect(document.querySelector('[data-cr-action="pagaleve"] .cr-logo-pagaleve')).not.toBeNull()
       expect(document.querySelector('[data-cr-action="nubank"] .cr-logo-nubank')).not.toBeNull()
       expect(document.querySelector('[data-cr-action="credit-card"] .cr-logo-card')).not.toBeNull()
+    })
+
+    it('inclui dois cartões apenas quando a loja habilita o split payment', async () => {
+      globalThis.__cr_settings = { enableSplitPayment: true }
+      runScript()
+      const orderForm = {
+        paymentData: {
+          paymentSystems: [
+            { id: 2, name: 'Visa', groupName: 'creditCardPaymentGroup' },
+          ],
+        },
+        messages: [{ text: 'Pagamento recusado' }],
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [orderForm])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('[data-cr-action="split-card"]')).not.toBeNull()
     })
   })
 
@@ -260,11 +277,26 @@ describe('PaySave', () => {
 
     it('exibe modal ao encontrar o status denied no aviso nativo', async () => {
       runScript()
-      const nativeMessage = document.createElement('div')
-      nativeMessage.textContent = 'Visa (2097): acquirer:Tuna - status:denied'
-      document.body.appendChild(nativeMessage)
+      const nativeModal = document.createElement('section')
+      nativeModal.setAttribute('role', 'dialog')
+      nativeModal.innerHTML = '<h2>Por favor, revise seus dados de pagamento</h2><p>Visa (2097): Tid:135282F000D66A9 - acquirer:Tuna - status:denied</p>'
+      document.body.appendChild(nativeModal)
       await new Promise((r) => setTimeout(r, 50))
       expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+      expect(nativeModal.classList.contains('cr-vtex-decline-hidden')).toBe(true)
+    })
+
+    it('não reabre uma recusa nativa após o cliente fechar o modal', async () => {
+      runScript()
+      const nativeMessage = document.createElement('div')
+      nativeMessage.textContent = 'Tid:135282F000D66A9 - status:denied'
+      document.body.appendChild(nativeMessage)
+      await new Promise((r) => setTimeout(r, 50))
+      document.querySelector('#cr-close-btn').click()
+      document.body.appendChild(document.createElement('span'))
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(true)
+      expect(document.querySelector('#cr-declines').textContent).toBe('1')
     })
 
     it('não duplica o modal para erros HTTP consecutivos de transação', async () => {
@@ -312,6 +344,7 @@ describe('PaySave', () => {
       document.querySelector('[data-cr-action="pix"]').click()
       await new Promise((r) => setTimeout(r, 50))
       expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(true)
+      expect(document.querySelector('#cr-backdrop').classList.contains('cr-hidden')).toBe(true)
       expect(nativePixClicked).toBe(true)
       const evts = window.dataLayer.filter((e) => e.event === 'paysave_checkout_recovered')
       expect(evts.length).toBe(1)
@@ -325,6 +358,19 @@ describe('PaySave', () => {
       const toast = document.querySelector('#cr-toast')
       expect(toast.classList.contains('cr-hidden')).toBe(false)
       expect(toast.textContent).toContain('novo cartão')
+    })
+
+    it('remove o backdrop do alerta nativo de recusa', async () => {
+      runScript()
+      const nativeBackdrop = document.createElement('div')
+      nativeBackdrop.className = 'modal-backdrop'
+      document.body.appendChild(nativeBackdrop)
+      const nativeAlert = document.createElement('div')
+      nativeAlert.setAttribute('role', 'dialog')
+      nativeAlert.textContent = 'Não foi possível aprovar sua compra. status:denied'
+      document.body.appendChild(nativeAlert)
+      await new Promise((r) => setTimeout(r, 50))
+      expect(nativeBackdrop.classList.contains('cr-vtex-decline-hidden')).toBe(true)
     })
   })
 
@@ -372,6 +418,39 @@ describe('PaySave', () => {
       await new Promise((r) => setTimeout(r, 50))
       const msgs = document.querySelectorAll('.cr-user-msg')
       expect(msgs.length).toBe(1)
+    })
+
+    it('mostra no chat todos os mesmos meios disponíveis na modal', async () => {
+      runScript()
+      const of = {
+        paymentData: {
+          paymentSystems: [
+            { name: 'Pix', groupName: 'instantPaymentPaymentGroup' },
+            { name: 'Pagaleve', groupName: 'PagalevePaymentGroup' },
+            { name: 'Nubank', groupName: 'NubankPaymentGroup' },
+            { name: 'Cartão', groupName: 'creditCardPaymentGroup' },
+          ],
+          transactions: [{ transactionId: 'tx-chat-options', status: 'denied' }],
+        },
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [of])
+      await new Promise((r) => setTimeout(r, 50))
+      document.querySelector('#cr-talk-now').click()
+      const modalMethods = Array.from(document.querySelectorAll('[data-cr-action]'))
+        .map((button) => button.getAttribute('data-cr-action'))
+      const chatMethods = Array.from(document.querySelectorAll('[data-cr-chat-method]'))
+        .map((button) => button.getAttribute('data-cr-chat-method'))
+      expect(chatMethods).toEqual(modalMethods)
+    })
+
+    it('abre o canal externo configurado para atendimento', async () => {
+      globalThis.__cr_settings = { chatHumanUrl: 'https://empresa.example/atendimento' }
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+      await openRecovery()
+      document.querySelector('#cr-talk-now').click()
+      document.querySelector('[data-cr-chat-action="human"]').click()
+      expect(openSpy).toHaveBeenCalledWith('https://empresa.example/atendimento', '_blank', 'noopener,noreferrer')
+      openSpy.mockRestore()
     })
   })
 

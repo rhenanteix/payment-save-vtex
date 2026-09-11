@@ -1,0 +1,4 @@
+:root { --ifm-color-primary: #006b50; --ifm-color-primary-dark: #00563f; --ifm-color-primary-light: #008b68; --ifm-font-family-base: Manrope, sans-serif; --ifm-heading-font-family: Manrope, sans-serif; --ifm-code-font-size: 90%; }
+.navbar__title { font-weight: 800; }
+.hero--primary { --ifm-hero-background-color: #dff6ed; --ifm-hero-text-color: #12211d; }
+.markdown h1 { color: #006b50; }

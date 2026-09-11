@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkpaysave_documentation=self.webpackChunkpaysave_documentation||[]).push([[7089],{7089(e,a,c){c.d(a,{createArchitectureServices:()=>t.S});var t=c(5796);c(4954)}}]);
