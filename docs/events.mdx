@@ -1,0 +1,18 @@
+---
+title: "Eventos"
+description: "Eventos enviados pelo PaySave para GA4 e GTM usando window.dataLayer."
+---
+
+| Evento | Quando ocorre |
+|---|---|
+| `paysave_paysave_loaded` | Script carregado no Checkout |
+| `paysave_payment_declined` | Recusa de pagamento detectada |
+| `paysave_recovery_modal_view` | Modal exibido |
+| `paysave_recovery_option_selected` | Cliente escolhe uma alternativa |
+| `paysave_checkout_recovered` | Grupo nativo de pagamento é selecionado |
+| `paysave_recovery_chat_open` | Chat de suporte aberto |
+| `paysave_chat_quick_reply` | Resposta rápida enviada no chat |
+
+## Exemplo no GTM
+
+Crie um gatilho de evento personalizado para `paysave_recovery_option_selected`. Use o campo `option` para identificar a alternativa escolhida, como `pix`, `pagaleve`, `nubank` ou `credit-card`.

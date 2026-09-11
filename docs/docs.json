@@ -1,0 +1,27 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "PaySave",
+  "favicon": "/images/favicon.svg",
+  "colors": {
+    "primary": "#006B50",
+    "light": "#008B68",
+    "dark": "#004D3A"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Comece aqui",
+        "pages": ["index", "installation"]
+      },
+      {
+        "group": "Operação",
+        "pages": ["configuration", "validation"]
+      },
+      {
+        "group": "Recursos",
+        "pages": ["demo", "events"]
+      }
+    ]
+  }
+}

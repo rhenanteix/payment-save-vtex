@@ -195,16 +195,25 @@
   flex-shrink: 0;
 }
 .cr-pix {
-  background: #dff6ed;
-  color: #008e68;
+  background: #fff;
 }
 .cr-card {
-  background: #e7effa;
-  color: #315e9d;
+  background: #fff;
+}
+.cr-pagaleve,
+.cr-nubank {
+  background: #fff;
 }
 .cr-boleto {
   background: #f0eeea;
   color: #6b6258;
+}
+
+.cr-logo-vtex {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 
 .cr-options button > span:nth-child(2) {

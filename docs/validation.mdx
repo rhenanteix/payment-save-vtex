@@ -1,0 +1,32 @@
+---
+title: "Validação"
+description: "Homologue o comportamento do PaySave antes de ativá-lo em produção."
+---
+
+## Roteiro funcional
+
+<Checklist>
+  <Check>Abra o Checkout no passo de pagamento com um carrinho controlado.</Check>
+  <Check>Confirme os métodos disponíveis nativamente na conta.</Check>
+  <Check>Simule uma recusa somente com o método autorizado pelo gateway ou adquirente.</Check>
+  <Check>Verifique que o modal aparece uma única vez para a tentativa.</Check>
+  <Check>Confirme que as opções do modal correspondem ao `orderForm`.</Check>
+  <Check>Teste cada alternativa e confirme que o grupo nativo fica ativo.</Check>
+  <Check>Confira os eventos `paysave_*` em `window.dataLayer`.</Check>
+</Checklist>
+
+## Cenários tratados
+
+| Origem | Condição |
+|---|---|
+| `orderFormUpdated.vtex` | Transação `denied`, `voided` ou `cancelled` |
+| `transactionValidation.vtex` | `status: denied` |
+| Erro HTTP do Checkout | Status `400` a `599` em rota de pagamento ou transação |
+
+## Registro de aprovação
+
+Guarde a URL do workspace, data, versão instalada, grupos exibidos, evento usado e resultado de cada método. Não registre número de cartão, CVV, token ou dados pessoais.
+
+<Warning>
+  Não use cartão real e não gere recusas em pedidos de clientes. O teste financeiro deve seguir o fluxo de homologação do gateway ativo na conta.
+</Warning>

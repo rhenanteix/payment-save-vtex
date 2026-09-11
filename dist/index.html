@@ -14,7 +14,7 @@
     <div class="hero-content">
       <img src="paysave-logo.png" alt="PaySave Logo" class="hero-logo" />
       <h1>Rescue your lost sales automatically.</h1>
-      <p>Seamless VTEX IO payment recovery. When a transaction is declined, PaySave instantly offers Pix, Boleto, or another card — saving the order before the customer leaves.</p>
+      <p>Seamless VTEX IO payment recovery. When a transaction is declined, PaySave instantly offers the payment methods configured by the store, saving the order before the customer leaves.</p>
       <div class="hero-actions">
         <a href="#demo" class="hero-btn primary-btn">Try the Interactive Demo</a>
         <a href="https://github.com/vtex-apps" class="hero-btn secondary-btn">View Documentation</a>
@@ -51,7 +51,6 @@
           <div class="payment-tabs">
             <button class="tab" data-method="pix">Pix</button>
             <button class="tab active" data-method="card">Cartão de crédito</button>
-            <button class="tab" data-method="boleto">Boleto</button>
           </div>
 
           <form id="paymentForm" class="payment-form">
@@ -134,11 +133,6 @@
       <button data-action="retry">
         <div class="method-icon card">💳</div>
         <span><strong>Tentar outro cartão</strong><small>Use um cartão diferente</small></span>
-        <div>›</div>
-      </button>
-      <button data-action="boleto">
-        <div class="method-icon boleto">📄</div>
-        <span><strong>Gerar boleto</strong><small>Vence em 2 dias úteis</small></span>
         <div>›</div>
       </button>
     </div>

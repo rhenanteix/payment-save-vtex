@@ -1,0 +1,20 @@
+---
+title: "Demonstração"
+description: "Apresente o PaySave sem depender de uma conta VTEX."
+---
+
+## Executar localmente
+
+```bash
+npm run presentation
+```
+
+Abra a URL exibida pelo servidor. A demonstração permite simular uma recusa, escolher alternativas e acompanhar os eventos do funil. Ela não envia requisições a gateways nem processa pagamentos.
+
+## Demonstração no Checkout real
+
+No workspace de desenvolvimento, abra o Checkout com `?cr-debug=1`. O parâmetro abre o modal com o `orderForm` disponível apenas em URLs de workspace, sendo ignorado na URL de produção.
+
+<Card title="Roteiro de homologação" icon="clipboard-check" href="/validation" horizontal>
+  Antes da demonstração real, aplique os controles de segurança do roteiro de validação.
+</Card>

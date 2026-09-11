@@ -1,0 +1,58 @@
+---
+title: "Instalação"
+description: "Instale o PaySave no Checkout v6 de uma conta VTEX."
+---
+
+## Pré-requisitos
+
+- Perfil de administrador na conta VTEX.
+- Checkout v6 ativo.
+- Workspace de desenvolvimento para a primeira validação.
+- Identificador de uma versão publicada pelo fornecedor, como `FORNECEDOR.paysave@1.x`.
+
+## Workspace de desenvolvimento
+
+<Steps>
+  <Step title="Autentique na conta">
+
+```bash
+npm install -g vtex
+vtex login NOME-DA-CONTA
+vtex use workspace-paysave
+```
+
+  </Step>
+  <Step title="Instale a app">
+
+```bash
+vtex install FORNECEDOR.paysave@1.x
+```
+
+  </Step>
+  <Step title="Abra o Checkout">
+    Acesse `https://workspace-paysave--NOME-DA-CONTA.myvtex.com/checkout`, adicione um item controlado ao carrinho e siga o [roteiro de validação](/validation).
+  </Step>
+</Steps>
+
+## Produção
+
+Instale no `master` somente depois de aprovar a validação em workspace.
+
+```bash
+vtex use master
+vtex install FORNECEDOR.paysave@1.x
+```
+
+<Warning>
+  Apenas o vendor proprietário consegue publicar uma versão instalável por outras contas. O parceiro consome o identificador que o fornecedor publicou.
+</Warning>
+
+## Publicação pelo fornecedor
+
+```bash
+vtex login CONTA-DO-FORNECEDOR
+vtex publish
+vtex deploy
+```
+
+Para interromper uma ativação, reinstale a versão anterior conhecida ou publique uma nova versão com `enabled: false`.

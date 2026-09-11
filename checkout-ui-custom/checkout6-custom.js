@@ -1,8 +1,9 @@
 /**
- * PaySave — VTEX IO Pixel App
- * vendor: myvendor | version: 1.0.0
+ * PaySave — VTEX IO Checkout UI Custom App
+ * vendor: trocafone | version: 1.0.0
  *
- * Este script é injetado em todas as páginas da loja pelo builder pixel.
+ * Este script é injetado no template do Checkout v6 pelo builder
+ * checkout-ui-custom.
  * Ele escuta eventos nativos do Checkout v6 da VTEX e exibe o modal de
  * recuperação quando uma transação é recusada.
  *
@@ -28,10 +29,32 @@
 
   if (!isCheckout) return
 
+  var isDevWorkspace = /--/.test(window.location.hostname)
+
   /* ────────────────────────────────────────────────────────────────────
-   * 2. SETTINGS — injetados pelo settingsSchema via (window.__cr_settings || globalThis.__cr_settings)
-   *    Fallback para valores padrão se o admin não configurou.
+   * 2. SETTINGS — configuração versionada do template Checkout
    * ────────────────────────────────────────────────────────────────────*/
+  var DEFAULT_PAYMENT_METHODS = [
+    {
+      id: 'pix',
+      label: 'Pagar com Pix',
+      description: 'Aprovação rápida · copie ou escaneie',
+      selector: '#payment-group-instantPaymentPaymentGroup, [data-payment-group="instantPaymentPaymentGroup"]',
+      toast: 'Pix selecionado — seu pedido continua reservado',
+      iconClass: 'cr-pix',
+      icon: '<img class="cr-logo-vtex cr-logo-pix" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/payment-pix-logo.svg" alt="">',
+    },
+    {
+      id: 'retry',
+      label: 'Tentar outro cartão',
+      description: 'Use um cartão diferente ou revise os dados',
+      selector: '#payment-group-creditCardPaymentGroup, .paymentGroupItem.creditCard, [data-payment-group="creditCardPaymentGroup"]',
+      toast: 'Você pode informar um novo cartão',
+      iconClass: 'cr-card',
+      icon: '<img class="cr-logo-vtex cr-logo-card" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/ico-credit2.png" alt="">',
+    },
+  ]
+
   var S = Object.assign(
     {
       enabled: true,
@@ -39,9 +62,21 @@
       showPixDiscount: false,
       pixDiscountLabel: '15% OFF',
       assistantName: 'Nina',
+      modalEyebrow: 'NÃO FOI POSSÍVEL APROVAR O PAGAMENTO',
+      modalTitle: 'Seu pedido ainda está reservado',
+      modalDescription: 'Não se preocupe: isso pode acontecer por segurança do banco. Você pode tentar novamente ou escolher outra forma de pagamento.',
+      optionsTitle: 'Escolha a melhor alternativa',
+      supportText: 'Quero ajuda para concluir minha compra',
+      chatGreeting: 'Olá! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir?',
+      launcherTitle: 'Precisa de ajuda?',
+      launcherSubtitle: 'Fale com a gente',
+      primaryColor: '#086b4d',
+      primaryLightColor: '#dff3eb',
+      accentColor: '#ff8800',
+      paymentMethods: DEFAULT_PAYMENT_METHODS,
       sendAnalytics: true,
     },
-    (window.__cr_settings || globalThis.__cr_settings) || {}
+    window.__cr_settings || {}
   )
 
   if (!S.enabled) return // feature flag de emergência
@@ -105,6 +140,103 @@
     return String(n).padStart(2, '0')
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]
+    })
+  }
+
+  function getPaymentMethods(orderForm) {
+    var systems = (((orderForm || {}).paymentData || {}).paymentSystems || [])
+    var groups = {}
+    var methods = []
+
+    systems.forEach(function (system) {
+      if (system && system.groupName) groups[system.groupName] = system
+    })
+
+    Object.keys(groups).forEach(function (groupName) {
+      var system = groups[groupName]
+      var method = null
+
+      if (groupName === 'instantPaymentPaymentGroup') {
+        method = {
+          id: 'pix',
+          label: system.name || 'Pix',
+          description: 'Aprovação rápida · copie ou escaneie',
+          toast: 'Pix selecionado — seu pedido continua reservado',
+          iconClass: 'cr-pix',
+          icon: '<img class="cr-logo-vtex cr-logo-pix" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/payment-pix-logo.svg" alt="">',
+        }
+      } else if (/^creditCardPaymentGroup$/i.test(groupName)) {
+        method = {
+          id: 'credit-card',
+          label: 'Cartão de crédito',
+          description: 'Use outro cartão ou revise os dados',
+          toast: 'Você pode informar um novo cartão',
+          iconClass: 'cr-card',
+          icon: '<img class="cr-logo-vtex cr-logo-card" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/ico-credit2.png" alt="">',
+        }
+      } else if (/pagaleve/i.test(groupName)) {
+        method = {
+          id: 'pagaleve',
+          label: system.name || 'Pix Parcelado',
+          description: 'Escolha o parcelamento disponível',
+          toast: (system.name || 'Pix Parcelado') + ' selecionado',
+          iconClass: 'cr-pagaleve',
+          icon: '<img class="cr-logo-vtex cr-logo-pagaleve" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/pagaleve/payment-pagaleve-logo.png" alt="">',
+        }
+      } else if (/nubank/i.test(groupName)) {
+        method = {
+          id: 'nubank',
+          label: system.name || 'NuPay',
+          description: 'Pague pelo app Nubank',
+          toast: (system.name || 'NuPay') + ' selecionado',
+          iconClass: 'cr-nubank',
+          icon: '<img class="cr-logo-vtex cr-logo-nubank" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/payment-nupay-logo.svg" alt="">',
+        }
+      }
+
+      if (method) {
+        method.groupName = groupName
+        methods.push(method)
+      }
+    })
+
+    return methods.length ? methods : getConfiguredPaymentMethods()
+  }
+
+  function getConfiguredPaymentMethods() {
+    var methods = S.paymentMethods
+    if (typeof methods === 'string') {
+      try {
+        methods = JSON.parse(methods)
+      } catch (e) {
+        methods = null
+      }
+    }
+    if (!Array.isArray(methods) || !methods.length) return DEFAULT_PAYMENT_METHODS
+    return methods.filter(function (method) {
+      return method && method.id && method.label && method.selector
+    })
+  }
+
+  function getPaymentMethod(action) {
+    var methods = getPaymentMethods(state.currentOrderForm)
+    for (var i = 0; i < methods.length; i++) {
+      if (methods[i].id === action) return methods[i]
+    }
+    return null
+  }
+
+  function applyTheme() {
+    var root = qs('#cr-root')
+    if (!root) return
+    root.style.setProperty('--cr-green', S.primaryColor)
+    root.style.setProperty('--cr-green-light', S.primaryLightColor)
+    root.style.setProperty('--cr-orange', S.accentColor)
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 5. DETECÇÃO DE RECUSA — baseada no orderForm real da VTEX
    *
@@ -122,6 +254,10 @@
     'declined',
     'recusad',
     'negad',
+    'não foi autorizad',
+    'nao foi autorizad',
+    'não autorizad',
+    'nao autorizad',
     'não autorizado',
     'nao autorizado',
     'reprovad',
@@ -144,14 +280,9 @@
     var transactions = payData.transactions || []
     for (var t = 0; t < transactions.length; t++) {
       var tx = transactions[t]
-      if (
-        tx.isActive &&
-        tx.transactionId &&
-        tx.merchantName &&
-        payData.payments
-      ) {
-        // Se há transação ativa mas o orderForm ainda está na etapa de pagamento,
-        // e existe um código de recusa nas mensagens — considera recusado
+      if (tx && tx.transactionId) {
+        // Após uma recusa, alguns gateways removem metadados opcionais do
+        // orderForm. O status terminal da própria transação é a fonte confiável.
         var txStatus = (tx.status || '').toLowerCase()
         if (
           txStatus === 'denied' ||
@@ -166,6 +297,31 @@
     return false
   }
 
+  function responseIndicatesDenial(jqXHR) {
+    var response = (jqXHR || {}).responseJSON || (jqXHR || {}).responseText || ''
+    if (typeof response !== 'string') {
+      try {
+        response = JSON.stringify(response)
+      } catch (e) {
+        response = ''
+      }
+    }
+    return /status\s*[":=]+\s*"?denied|não foi possível aprovar sua compra|nao foi possivel aprovar sua compra/i.test(response)
+  }
+
+  function openGatewayRecovery(source) {
+    var modal = qs('#cr-modal')
+    if (modal && !modal.classList.contains('cr-hidden')) return
+
+    var now = Date.now()
+    if (state.lastGatewayDeclineAt && now - state.lastGatewayDeclineAt < 3000) return
+
+    state.lastGatewayDeclineAt = now
+    state.declines++
+    pushEvent('payment_declined', { source: source })
+    openModal(state.currentOrderForm)
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 6. INJEÇÃO DO HTML DO MODAL
    *    Inserido dinamicamente no <body> para não interferir com o checkout.
@@ -174,8 +330,24 @@
     if (qs('#cr-root')) return // já injetado
 
     var pixBadge = S.showPixDiscount
-      ? '<em class="cr-pix-badge">' + S.pixDiscountLabel + '</em>'
+      ? '<em class="cr-pix-badge">' + escapeHtml(S.pixDiscountLabel) + '</em>'
       : ''
+
+    function paymentOptionsHtml(paymentMethods) {
+      return paymentMethods
+      .map(function (method) {
+        var badge = method.id === 'pix' ? pixBadge : ''
+        return [
+          '    <button data-cr-action="' + escapeHtml(method.id) + '">',
+          '      <span class="cr-method-icon ' + escapeHtml(method.iconClass || 'cr-card') + '">' + (method.icon || '&#9635;') + '</span>',
+          '      <span><strong>' + escapeHtml(method.label) + '</strong><small>' + escapeHtml(method.description || '') + '</small></span>',
+          '      ' + badge,
+          '      <b>&#8250;</b>',
+          '    </button>',
+        ].join('\n')
+      })
+      .join('\n')
+    }
 
     var html = [
       '<div id="cr-root">',
@@ -187,9 +359,9 @@
       '<section id="cr-modal" class="cr-modal cr-hidden" role="dialog" aria-modal="true" aria-labelledby="cr-modal-title">',
       '  <button class="cr-close" id="cr-close-btn" aria-label="Fechar">&times;</button>',
       '  <div class="cr-status-icon">!</div>',
-      '  <span class="cr-eyebrow cr-danger">NÃO FOI POSSÍVEL APROVAR O PAGAMENTO</span>',
-      '  <h2 id="cr-modal-title">Seu pedido ainda está reservado</h2>',
-      '  <p class="cr-lead">Não se preocupe: isso pode acontecer por segurança do banco. Você pode tentar novamente ou escolher outra forma de pagamento.</p>',
+      '  <span class="cr-eyebrow cr-danger">' + escapeHtml(S.modalEyebrow) + '</span>',
+      '  <h2 id="cr-modal-title">' + escapeHtml(S.modalTitle) + '</h2>',
+      '  <p class="cr-lead">' + escapeHtml(S.modalDescription) + '</p>',
       '  <div class="cr-reservation">',
       '    <span>&#9201;</span>',
       '    <div>',
@@ -197,42 +369,27 @@
       '      <small id="cr-product-name">Seu produto continua separado para você.</small>',
       '    </div>',
       '  </div>',
-      '  <h3>Escolha a melhor alternativa</h3>',
-      '  <div class="cr-options">',
-      '    <button data-cr-action="pix">',
-      '      <span class="cr-method-icon cr-pix">&#9674;</span>',
-      '      <span><strong>Pagar com Pix</strong><small>Aprovação rápida · copie ou escaneie</small></span>',
-      '      ' + pixBadge,
-      '      <b>&#8250;</b>',
-      '    </button>',
-      '    <button data-cr-action="retry">',
-      '      <span class="cr-method-icon cr-card">&#9635;</span>',
-      '      <span><strong>Tentar outro cartão</strong><small>Use um cartão diferente ou revise os dados</small></span>',
-      '      <b>&#8250;</b>',
-      '    </button>',
-      '    <button data-cr-action="boleto">',
-      '      <span class="cr-method-icon cr-boleto">&#9636;</span>',
-      '      <span><strong>Gerar boleto</strong><small>Vencimento amanhã · confirmação em até 2 dias</small></span>',
-      '      <b>&#8250;</b>',
-      '    </button>',
+      '  <h3>' + escapeHtml(S.optionsTitle) + '</h3>',
+      '  <div class="cr-options" id="cr-options">',
+      paymentOptionsHtml(getConfiguredPaymentMethods()),
       '  </div>',
-      '  <button id="cr-talk-now" class="cr-support-link">&#9685; Quero ajuda para concluir minha compra</button>',
+      '  <button id="cr-talk-now" class="cr-support-link">&#9685; ' + escapeHtml(S.supportText) + '</button>',
       '  <p class="cr-reason-code" id="cr-reason-code">Tentativa de pagamento não autorizada.</p>',
       '</section>',
 
       // Chat
       '<aside id="cr-chat" class="cr-chat cr-hidden" aria-label="Assistente de compra">',
       '  <header>',
-      '    <div class="cr-agent-avatar" aria-hidden="true">' + S.assistantName[0].toUpperCase() + '</div>',
+      '    <div class="cr-agent-avatar" aria-hidden="true">' + escapeHtml(S.assistantName[0].toUpperCase()) + '</div>',
       '    <div>',
-      '      <strong>' + S.assistantName + ' &middot; Assistente de compra</strong>',
+      '      <strong>' + escapeHtml(S.assistantName) + ' &middot; Assistente de compra</strong>',
       '      <span><i></i> Online agora</span>',
       '    </div>',
       '    <button id="cr-chat-close" data-cr-chat-close aria-label="Fechar chat">&times;</button>',
       '  </header>',
       '  <div id="cr-messages" class="cr-messages">',
       '    <div class="cr-bot-msg">',
-      '      Olá! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir?',
+      '      ' + escapeHtml(S.chatGreeting),
       '      <time>agora</time>',
       '    </div>',
       '    <div class="cr-quick-actions">',
@@ -250,7 +407,7 @@
       // Chat launcher (FAB)
       '<button id="cr-launcher" class="cr-launcher cr-hidden" aria-label="Falar com assistente">',
       '  <span aria-hidden="true">&#9685;</span>',
-      '  <span>Precisa de ajuda?<small>Fale com a gente</small></span>',
+      '  <span>' + escapeHtml(S.launcherTitle) + '<small>' + escapeHtml(S.launcherSubtitle) + '</small></span>',
       '  <b id="cr-badge" class="cr-hidden" aria-label="1 mensagem">1</b>',
       '</button>',
 
@@ -280,7 +437,30 @@
     wrapper.innerHTML = html
     document.body.appendChild(wrapper.firstChild)
 
+    applyTheme()
     bindEvents()
+  }
+
+  function renderPaymentOptions(orderForm) {
+    var options = qs('#cr-options')
+    if (!options) return
+    var methods = getPaymentMethods(orderForm)
+    options.innerHTML = methods
+      .map(function (method) {
+        var badge = method.id === 'pix' && S.showPixDiscount
+          ? '<em class="cr-pix-badge">' + escapeHtml(S.pixDiscountLabel) + '</em>'
+          : ''
+        return [
+          '<button data-cr-action="' + escapeHtml(method.id) + '">',
+            '      <span class="cr-method-icon ' + escapeHtml(method.iconClass || 'cr-card') + '">' + (method.icon || '<img class="cr-logo-vtex cr-logo-card" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/ico-credit2.png" alt="">') + '</span>',
+          '<span><strong>' + escapeHtml(method.label) + '</strong><small>' + escapeHtml(method.description || '') + '</small></span>',
+          badge,
+          '<b>&#8250;</b>',
+          '</button>',
+        ].join('')
+      })
+      .join('')
+    bindPaymentOptionEvents()
   }
 
   /* ────────────────────────────────────────────────────────────────────
@@ -289,9 +469,15 @@
   function openModal(orderForm) {
     injectModal()
 
+    orderForm =
+      orderForm ||
+      state.currentOrderForm ||
+      (((window.vtexjs || {}).checkout || {}).orderForm || null)
+
     // Personaliza com dados reais do orderForm
     if (orderForm) {
       state.currentOrderForm = orderForm
+      renderPaymentOptions(orderForm)
       var items = (orderForm.items || [])
       var firstName = ''
       try {
@@ -369,35 +555,24 @@
     pushEvent('recovery_option_selected', { option: action })
     closeModal()
 
-    // Tenta clicar na tab de pagamento correta do Checkout v6 nativo
-    var tabSelectors = {
-      pix: '[data-payment-group="instantPaymentPaymentGroup"]',
-      boleto: '[data-payment-group="bankInvoicePaymentGroup"]',
-      retry: '.paymentGroupItem.creditCard, [data-payment-group="creditCardPaymentGroup"]',
-    }
-
-    var selector = tabSelectors[action]
-    if (selector) {
-      var tab = qs(selector)
-      if (tab) {
-        tab.click()
-        setTimeout(function () {
-          // Scroll para o formulário de pagamento
-          var form = qs('#payment-data') || qs('.payment-option')
-          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }, 300)
-      }
+    // Cada parceiro configura o seletor da opção nativa no Checkout v6.
+    var method = getPaymentMethod(action)
+    var tab = method && method.groupName
+      ? document.getElementById('payment-group-' + method.groupName)
+      : qs(method && method.selector)
+    if (tab) {
+      tab.click()
+      setTimeout(function () {
+        // Scroll para o formulário de pagamento
+        var form = qs('#payment-data') || qs('.payment-option')
+        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
     }
 
     state.recoveries++
     renderMetrics()
 
-    var messages = {
-      pix: 'Pix selecionado — seu pedido continua reservado',
-      boleto: 'Boleto selecionado — pedido preservado',
-      retry: 'Você pode informar um novo cartão',
-    }
-    showToast(messages[action] || 'Método atualizado')
+    showToast((method && method.toast) || 'Método atualizado')
     pushEvent('checkout_recovered', { new_method: action })
   }
 
@@ -470,12 +645,7 @@
     if (closeBtn) closeBtn.addEventListener('click', closeModal)
     if (backdrop) backdrop.addEventListener('click', closeModal)
 
-    // Opções de recuperação
-    qsa('[data-cr-action]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        recover(btn.getAttribute('data-cr-action'))
-      })
-    })
+    bindPaymentOptionEvents()
 
     // Chat
     var talkBtn = qs('#cr-talk-now')
@@ -547,13 +717,25 @@
       })
   }
 
+  function bindPaymentOptionEvents() {
+    qsa('[data-cr-action]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        recover(btn.getAttribute('data-cr-action'))
+      })
+    })
+  }
+
   /* ────────────────────────────────────────────────────────────────────
    * 13. ESCUTA DE EVENTOS NATIVOS DO CHECKOUT V6
    * ────────────────────────────────────────────────────────────────────*/
 
-  // Evento primário: orderForm atualizado
-  ;(window.$ || window.jQuery) &&
-    (window.$ || window.jQuery)(window).on(
+  function bindCheckoutEvents() {
+    var checkoutJQuery = window.$ || window.jQuery
+    if (!checkoutJQuery || state.checkoutEventsBound) return
+    state.checkoutEventsBound = true
+
+    // Evento primário: orderForm atualizado
+    checkoutJQuery(window).on(
       'orderFormUpdated.vtex',
       function (evt, orderForm) {
         if (!orderForm) return
@@ -579,9 +761,8 @@
       }
     )
 
-  // Evento fallback: transactionValidation (disparado pelo Payment App ou Gateway)
-  ;(window.$ || window.jQuery) &&
-    (window.$ || window.jQuery)(document).on(
+    // Evento fallback: transactionValidation (disparado pelo Payment App ou Gateway)
+    checkoutJQuery(document).on(
       'transactionValidation.vtex',
       function (evt, data) {
         if (data && data.status === 'denied') {
@@ -591,6 +772,36 @@
         }
       }
     )
+
+    checkoutJQuery(document).ajaxError(function (evt, jqXHR, ajaxSettings) {
+      var requestUrl = ((ajaxSettings || {}).url || '').toLowerCase()
+      var status = Number((jqXHR || {}).status || 0)
+      var isPaymentRequest = /transaction|payment/.test(requestUrl)
+      var isRequestFailure = status >= 400 && status < 600
+
+      if (isPaymentRequest && isRequestFailure) openGatewayRecovery('checkout_ajax_error')
+    })
+
+    // Gateways como a Tuna podem responder 200 e informar a recusa no corpo.
+    checkoutJQuery(document).ajaxComplete(function (evt, jqXHR, ajaxSettings) {
+      var requestUrl = ((ajaxSettings || {}).url || '').toLowerCase()
+      if (/transaction|payment/.test(requestUrl) && responseIndicatesDenial(jqXHR)) {
+        openGatewayRecovery('checkout_transaction_response')
+      }
+    })
+
+    // Última proteção: observa o aviso nativo exibido pela VTEX quando nenhum
+    // evento do orderForm chega ao script de customização.
+    if (window.MutationObserver && document.body) {
+      var nativeDeclineObserver = new window.MutationObserver(function () {
+        if (/status\s*:\s*denied/i.test(document.body.textContent || '')) {
+          openGatewayRecovery('checkout_native_denial_message')
+        }
+      })
+      nativeDeclineObserver.observe(document.body, { childList: true, subtree: true })
+    }
+
+  }
 
   // Aguarda jQuery ser carregado (o Checkout v6 carrega o jQuery nativo)
   function waitForjQuery(cb, attempts) {
@@ -610,13 +821,18 @@
    * ────────────────────────────────────────────────────────────────────*/
   function init() {
     injectModal()
+    waitForjQuery(bindCheckoutEvents)
     pushEvent('paysave_loaded', { version: '1.0.0' })
 
-
+    if (
+      isDevWorkspace &&
+      new URLSearchParams(window.location.search).get('cr-debug') === '1'
+    ) {
+      openModal()
+    }
 
     // Adiciona botão de métricas discreta para o parceiro validar
     // (apenas em workspaces dev — verificado pelo hostname)
-    var isDevWorkspace = /--/.test(window.location.hostname)
     if (isDevWorkspace) {
       var metricsBtn = document.createElement('button')
       metricsBtn.id = 'cr-metrics-trigger'

@@ -1,9 +1,31 @@
 # PaySave — VTEX IO App
 
-Modal de recuperação de vendas para o **Checkout v6 da VTEX**. Quando uma transação é recusada pelo gateway, exibe automaticamente alternativas de pagamento (Pix, boleto, outro cartão) e um chat de suporte — mantendo o pedido reservado e aumentando a taxa de conversão.
+Modal de recuperação de vendas para o **Checkout v6 da VTEX**. Quando uma transação é recusada pelo gateway, exibe automaticamente as alternativas de pagamento configuradas pela loja e um chat de suporte, mantendo o pedido reservado e aumentando a taxa de conversão.
 
-> **Versão atual:** `1.0.0` · **Builder:** `pixel 1.x`  
-> O diretório `dist/` contém o **protótipo navegável** para apresentações. A pasta `pixel/` contém o **app VTEX IO real**.
+> **Versão atual:** `1.0.0` · **Builder:** `checkout-ui-custom 0.x`
+> O diretório `dist/` contém o **protótipo navegável** para apresentações. A pasta `checkout-ui-custom/` contém o app VTEX IO publicado no Checkout v6.
+
+## Material para parceiros
+
+- [Portal Mintlify da documentação](docs/)
+- [Instalação do PaySave](docs/installation.mdx)
+- [Validação antes da produção](docs/validation.mdx)
+- [Landing page do produto](landing/index.html)
+
+### Publicar o portal Mintlify
+
+O portal fonte está em `docs/`, com configuração em `docs/docs.json`. Para conectá-lo ao Mintlify, crie ou acesse a organização em `app.mintlify.com`, conecte este repositório e selecione a pasta `docs` como raiz da documentação. Após a autorização, use:
+
+```bash
+npm install -g mint
+cd docs
+mint login
+mint dev
+mint validate
+mint broken-links
+```
+
+O Mintlify publica automaticamente as alterações enviadas à branch configurada e fornece a URL `https://SEU-PROJETO.mintlify.app`. Configure essa URL nos links da landing hospedada separadamente.
 
 ---
 
@@ -11,10 +33,10 @@ Modal de recuperação de vendas para o **Checkout v6 da VTEX**. Quando uma tran
 
 ```text
 paysave-vtex/
-├── manifest.json              ← identidade e configurações do app VTEX IO
-├── pixel/
-│   ├── paysave.js     ← script principal (injetado pelo builder pixel)
-│   └── paysave.css    ← estilos do modal (prefixo cr- para isolamento)
+├── manifest.json              ← identidade do app VTEX IO
+├── checkout-ui-custom/
+│   ├── checkout6-custom.js    ← script principal injetado no Checkout v6
+│   └── checkout6-custom.css   ← estilos do modal (prefixo cr- para isolamento)
 ├── dist/                      ← protótipo estático para demo/apresentação
 │   ├── index.html
 │   ├── styles.css
@@ -27,11 +49,39 @@ paysave-vtex/
 ## Como funciona na VTEX real
 
 1. O parceiro instala o app na conta dele via `vtex install`.
-2. O builder `pixel` injeta `paysave.js` e `paysave.css` automaticamente em todas as páginas da loja.
-3. O script aguarda o jQuery nativo do Checkout v6 e escuta o evento `orderFormUpdated.vtex`.
-4. Quando detecta uma transação recusada (`denied`, `voided`, `cancelled`), exibe o modal **uma única vez** por tentativa.
+2. O builder `checkout-ui-custom` vincula `checkout6-custom.js` e `checkout6-custom.css` ao template do Checkout v6.
+3. O script aguarda o jQuery nativo do Checkout v6 e escuta eventos do `orderForm`, do gateway e as respostas de transação.
+4. Quando detecta uma transação recusada, exibe o modal **uma única vez** por tentativa.
 5. O cliente escolhe uma alternativa; o script clica na tab correta do Checkout v6 nativo.
 6. Os eventos são enviados para `window.dataLayer` (compatível com GA4/GTM).
+
+---
+
+## Status e sinais validados
+
+O PaySave é uma camada de recuperação. Ele nunca autoriza, captura ou cancela pagamentos: a decisão financeira continua sendo da VTEX e do gateway.
+
+| Retorno ou sinal do Checkout | PaySave abre o modal? | Como é identificado |
+|---|---:|---|
+| Transação `denied` | Sim | `orderFormUpdated.vtex` com `paymentData.transactions[].status` |
+| Transação `voided` | Sim | `orderFormUpdated.vtex` com `paymentData.transactions[].status` |
+| Transação `cancelled` | Sim | `orderFormUpdated.vtex` com `paymentData.transactions[].status` |
+| Gateway com `{ status: "denied" }` | Sim | `transactionValidation.vtex` |
+| Erro HTTP de transação ou pagamento ($4xx$/$5xx$) | Sim | `ajaxError` do Checkout |
+| Recusa no corpo de resposta HTTP $2xx$, comum em gateways como Tuna | Sim | resposta de `transaction` ou `payment` com `status:denied` ou mensagem de não aprovação |
+| Aviso nativo VTEX/Tuna com `status:denied` | Sim | observação do aviso renderizado no Checkout |
+| `approved`, `authorized`, `pending` ou pagamento em processamento | Não | não representa uma recusa confirmada |
+| Estoque, endereço, entrega ou frete inválidos | Não | não são respostas de pagamento |
+
+### Funcionalidades disponíveis
+
+- Modal de recuperação sobre o Checkout nativo, sem remover a mensagem original da VTEX.
+- Métodos renderizados do `orderForm`: Pix, Pagaleve, Nubank e uma opção de cartão na Trocafone; fallback configurável para outras contas.
+- Ícones oficiais usados pelo Checkout VTEX para os métodos reconhecidos.
+- Chat de suporte, respostas rápidas e painel de métricas da sessão no workspace de desenvolvimento.
+- Eventos `dataLayer` para acompanhar recusa, visualização, seleção de método e recuperação.
+- Modo controlado `?cr-debug=1` para abrir o modal no Checkout de uma workspace, sem tentativa de cobrança.
+- Feature flag `enabled` para interrupção imediata em uma nova versão do app.
 
 ---
 
@@ -47,45 +97,82 @@ npm install -g vtex   # instala o VTEX Toolbelt (uma vez)
 
 ```bash
 vtex login NOME-DA-CONTA
-vtex install myvendor.paysave@1.x
+vtex install trocafone.paysave@1.x
 ```
 
-### 2. Configurar no Admin VTEX
+### 2. Configurar o template do Checkout
 
-Acesse **Admin → Apps → PaySave → Configurações** e ajuste:
+A Edition ativa da Trocafone não suporta o builder `pixel`. O app usa o builder oficial `checkout-ui-custom`, que publica scripts versionados para o template. Altere o objeto `S` em `checkout-ui-custom/checkout6-custom.js` para mudar nome do chat, textos, métodos, seletores e feature flag. As cores ficam em `checkout-ui-custom/checkout6-custom.css`. Depois execute `vtex link --no-watch` no workspace de desenvolvimento.
 
-| Campo | Padrão | Descrição |
-|---|---|---|
-| Ativar PaySave | `true` | Feature flag de emergência |
-| Tempo de reserva (min) | `10` | Countdown exibido no modal |
-| Mostrar badge Pix | `false` | Badge promocional na opção Pix |
-| Label do badge Pix | `15% OFF` | Texto do badge |
-| Nome da assistente | `Nina` | Nome no chat de suporte |
-| Enviar para dataLayer | `true` | Integração com GTM/GA4 |
+As mudanças ficam versionadas no app e podem ser revertidas ao instalar a versão anterior. Uma tela no Admin para edição sem novo link exigirá um segundo app administrativo e uma API pública de configurações; o template de Checkout não fornece `settingsSchema` diretamente ao browser.
+
+### Métodos de pagamento e outras empresas
+
+Quando o Checkout informa `orderForm.paymentData.paymentSystems`, o modal monta suas opções a partir desses grupos. Na configuração atual da Trocafone, ele apresenta Pix, Pagaleve Pix Mensal Transparente, Nubank e uma única opção de cartão de crédito, mesmo quando existem várias bandeiras. O botão selecionado sempre clica no grupo nativo correspondente do Checkout. Boleto não é incluído.
+
+Para uma conta que não exponha esses grupos reconhecidos, `S.paymentMethods` aceita uma lista JSON de fallback. Cada item usa o `selector` da opção já existente no Checkout v6 da conta; por isso o app não cria nem tenta processar meios de pagamento.
+
+```json
+[
+	{
+		"id": "pix",
+		"label": "Pagar com Pix",
+		"description": "Aprovação rápida",
+		"selector": "[data-payment-group='instantPaymentPaymentGroup']",
+		"toast": "Pix selecionado"
+	},
+	{
+		"id": "wallet",
+		"label": "Pagar com carteira",
+		"description": "Use seu saldo disponível",
+		"selector": "[data-payment-group='walletPaymentGroup']",
+		"toast": "Carteira selecionada"
+	}
+]
+```
+
+Confirme o seletor na página de pagamento de cada loja antes de publicar a configuração.
+
+Para identificar o seletor, abra o Checkout da conta em um workspace de desenvolvimento e inspecione o botão do método de pagamento nativo. Na Trocafone, os grupos reais são `#payment-group-instantPaymentPaymentGroup`, `#payment-group-Pagaleve Pix Mensal TransparentePaymentGroup`, `#payment-group-NubankPaymentGroup` e `#payment-group-creditCardPaymentGroup`. Mantenha o seletor alternativo somente quando outra implementação de Checkout usar `data-payment-group`.
 
 ---
 
 ## Desenvolvimento e testes
 
-### Publicar em workspace dev
+### Validar com dados reais do Checkout
+
+O workspace de desenvolvimento usa o catálogo e a configuração de checkout da conta, mas é isolado da URL que os clientes acessam. Faça a primeira validação nele, com um produto de teste e uma conta de comprador controlada.
 
 ```bash
-vtex use dev        # cria workspace de desenvolvimento
-vtex link           # publica em tempo real (hot reload)
+vtex login NOME-DA-CONTA
+vtex use paysave-test
+vtex link
 ```
 
-Acesse `https://CONTA--dev.myvtex.com/checkout` e adicione `?cr-debug=1` para forçar a abertura do modal durante testes.
+Acesse `https://paysave-test--NOME-DA-CONTA.myvtex.com/checkout?cr-debug=1`. O parâmetro abre o modal com o `orderForm` real somente em URL de workspace (`workspace--conta.myvtex.com`); ele é ignorado na URL de produção.
+
+1. Confirme que os textos, cores e nome do chat configurados no app aparecem no modal.
+2. Clique em cada método configurado e valide que o Checkout abre o meio de pagamento nativo correto.
+3. Verifique no DevTools que os eventos `paysave_*` chegam ao `window.dataLayer`.
+4. Teste uma recusa apenas com o método de homologação autorizado pelo adquirente ou gateway da conta. Não use cartão real nem provoque recusas em pedidos de clientes.
+
+O app está validado para recusas em `orderFormUpdated.vtex` (`denied`, `voided` ou `cancelled`), `transactionValidation.vtex` (`status: denied`), erros HTTP de transação e respostas $2xx$ cujo corpo contenha a recusa do gateway. Ele também reconhece o aviso nativo VTEX/Tuna com `status:denied` como última proteção. A recusa financeira real depende do cartão de teste homologado pelo gateway ativo na conta; peça esse dado ao responsável por pagamentos da Trocafone antes de finalizar um pedido de teste.
+
+### Ativar em produção
+
+Depois da validação no workspace, publique uma versão com o vendor VTEX IO da organização. Este projeto está configurado com `trocafone`, conforme a conta VTEX ativa.
+
+```bash
+vtex publish
+vtex deploy
+vtex install trocafone.paysave@1.x
+```
+
+Antes de ativar, mantenha `enabled: false` no objeto `S`, faça a validação no workspace e publique essa versão. Para iniciar o experimento, altere para `enabled: true`, publique uma nova versão e instale-a em uma janela de baixo tráfego. Para interromper o experimento, reinstale a versão anterior ou publique imediatamente uma versão com `enabled: false`.
 
 ### Verificar integração
 
 No workspace dev, um botão discreto **"▼ PaySave"** aparece na borda inferior da página com o painel de métricas e timeline de eventos.
-
-### Publicar para produção
-
-```bash
-vtex publish        # publica versão no registro VTEX IO
-vtex deploy         # disponibiliza no App Store (requer conta parceiro)
-```
 
 ---
 
@@ -110,7 +197,7 @@ vtex deploy         # disponibiliza no App Store (requer conta parceiro)
 - ✅ Não exibe para erros de estoque, endereço ou frete
 - ✅ Exibe **uma única vez** por transação (flag por `transactionId`)
 - ✅ Usa prefixo `cr-` em todas as classes CSS (sem colisão)
-- ✅ Feature flag no Admin para desativação imediata sem redeploy
+- ✅ Feature flag versionada no template para ativação e desativação controladas
 
 ---
 
@@ -131,7 +218,7 @@ npx serve dist
 1. Abra a página
 2. Mantenha "Cartão de crédito" selecionado
 3. Clique em "Simular recusa do pagamento"
-4. Teste Pix, boleto, outro cartão e o assistente
+4. Teste os métodos configurados e o assistente
 5. Abra "Ver eventos do funil" para acompanhar a timeline
 
 ---

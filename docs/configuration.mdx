@@ -1,0 +1,35 @@
+---
+title: "Configuração por loja"
+description: "Adapte o PaySave aos meios de pagamento disponíveis na sua conta."
+---
+
+## Detecção automática
+
+O PaySave monta a lista usando `orderForm.paymentData.paymentSystems`. Métodos reconhecidos são associados ao grupo nativo do Checkout e o clique do modal apenas ativa esse grupo.
+
+| Grupo VTEX | Exibição no modal |
+|---|---|
+| `instantPaymentPaymentGroup` | Pix |
+| `Pagaleve Pix Mensal TransparentePaymentGroup` | Pagaleve Pix Mensal Transparente |
+| `NubankPaymentGroup` | NuPay |
+| `creditCardPaymentGroup` | Cartão de crédito |
+
+## Fallback para outra conta
+
+Quando uma loja tiver grupos diferentes, configure `paymentMethods` no objeto `S` de `checkout-ui-custom/checkout6-custom.js`. Cada método deve apontar para uma opção já existente no Checkout.
+
+```json
+[
+  {
+    "id": "wallet",
+    "label": "Pagar com carteira",
+    "description": "Use seu saldo disponível",
+    "selector": "[data-payment-group='walletPaymentGroup']",
+    "toast": "Carteira selecionada"
+  }
+]
+```
+
+<Info>
+  O PaySave não cria um método de pagamento. Confirme o seletor em um workspace de desenvolvimento antes de publicar uma alteração.
+</Info>

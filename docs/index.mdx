@@ -1,0 +1,37 @@
+---
+title: "PaySave para VTEX"
+description: "Recupere clientes após uma recusa de pagamento no Checkout v6."
+---
+
+<Note>
+  O PaySave funciona dentro do Checkout v6 e só é exibido após uma recusa de pagamento.
+</Note>
+
+## O que o PaySave faz
+
+Quando o gateway recusa uma tentativa, o PaySave apresenta as alternativas já disponíveis na loja. O cliente escolhe uma delas e o app ativa a opção nativa correspondente no Checkout.
+
+<CardGroup cols={2}>
+  <Card title="Instalar no Checkout" icon="download" href="/installation">
+    Instale uma versão publicada no workspace de desenvolvimento da sua conta.
+  </Card>
+  <Card title="Validar antes de produção" icon="badge-check" href="/validation">
+    Siga o roteiro de homologação com uma tentativa controlada.
+  </Card>
+</CardGroup>
+
+## Garantias do fluxo
+
+- Não captura número de cartão, CVV ou tokens.
+- Não cria nem processa novos meios de pagamento.
+- Não repete automaticamente uma autorização.
+- Exibe o modal uma vez para cada tentativa recusada.
+- Envia métricas para `window.dataLayer`.
+
+## Métodos exibidos
+
+O app lê `orderForm.paymentData.paymentSystems`. Na Trocafone, a validação atual contempla Pix, Pagaleve Pix Mensal Transparente, NuPay e cartão de crédito. Os ícones são os mesmos arquivos servidos pelo Checkout VTEX.
+
+<Card title="Veja a demonstração" icon="play" href="/demo" horizontal>
+  Execute a demonstração local sem acessar uma conta VTEX.
+</Card>

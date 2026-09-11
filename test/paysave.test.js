@@ -4,7 +4,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const SCRIPT_PATH = join(__dirname, '..', 'pixel', 'paysave.js')
+const SCRIPT_PATH = join(__dirname, '..', 'checkout-ui-custom', 'checkout6-custom.js')
 const SCRIPT_SRC = readFileSync(SCRIPT_PATH, 'utf8')
 
   function createJQuery() {
@@ -15,9 +15,15 @@ const SCRIPT_SRC = readFileSync(SCRIPT_PATH, 'utf8')
     $.on = function (evt, fn) {
       ;(handlers[evt] = handlers[evt] || []).push(fn)
     }
+    $.ajaxError = function (fn) {
+      $.on('ajaxError', fn)
+    }
+    $.ajaxComplete = function (fn) {
+      $.on('ajaxComplete', fn)
+    }
     $.trigger = function (evt, ...args) {
       const params = args.length === 1 && Array.isArray(args[0]) ? args[0] : args
-      ;(handlers[evt] || []).forEach((fn) => fn(...params))
+      ;(handlers[evt] || []).forEach((fn) => fn({ type: evt }, ...params))
     }
     $.fn = { on: $.on }
     window.$ = $
@@ -77,23 +83,47 @@ describe('PaySave', () => {
       expect(countdown.textContent).toBe('10:00')
     })
 
-    it.skip('aplica valores customizados do admin', () => {
-      globalThis.__cr_settings = {
-        reservationMinutes: 5,
-        assistantName: 'Bia',
-        pixDiscountLabel: '10% OFF',
-        showPixDiscount: true,
-      }
+    it('não inclui boleto por padrão', () => {
       runScript()
-      const countdown = document.querySelector('#cr-countdown')
-      expect(countdown.textContent).toBe('05:00')
-      expect(document.querySelector('#cr-agent-avatar').textContent).toBe('B')
-      expect(document.querySelector('.cr-pix-badge').textContent).toBe('10% OFF')
+      expect(document.querySelector('[data-cr-action="boleto"]')).toBeNull()
+      expect(document.querySelector('[data-cr-action="pix"]')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="retry"]')).not.toBeNull()
+    })
+
+    it('exibe os métodos disponíveis no orderForm da Trocafone', async () => {
+      runScript()
+      const of = {
+        orderFormId: 'of-payment-systems',
+        paymentData: {
+          payments: [],
+          transactions: [],
+          paymentSystems: [
+            { id: 125, name: 'Pix', groupName: 'instantPaymentPaymentGroup' },
+            { id: 848, name: 'Pagaleve Pix Mensal Transparente', groupName: 'Pagaleve Pix Mensal TransparentePaymentGroup' },
+            { id: 178, name: 'Nubank', groupName: 'NubankPaymentGroup' },
+            { id: 2, name: 'Visa', groupName: 'creditCardPaymentGroup' },
+            { id: 4, name: 'Mastercard', groupName: 'creditCardPaymentGroup' },
+          ],
+        },
+        messages: [{ text: 'A transação não foi autorizada.' }],
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [of])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelectorAll('[data-cr-action]').length).toBe(4)
+      expect(document.querySelector('[data-cr-action="pix"]')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="pagaleve"]')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="nubank"]')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="credit-card"]')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="boleto"]')).toBeNull()
+      expect(document.querySelector('[data-cr-action="pix"] .cr-logo-pix')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="pagaleve"] .cr-logo-pagaleve')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="nubank"] .cr-logo-nubank')).not.toBeNull()
+      expect(document.querySelector('[data-cr-action="credit-card"] .cr-logo-card')).not.toBeNull()
     })
   })
 
   describe('detecção de recusa', () => {
-    it.skip('exibe modal para status denied', async () => {
+    it('exibe modal para status denied', async () => {
       runScript()
       const deniedOrderForm = {
         paymentData: {
@@ -111,7 +141,21 @@ describe('PaySave', () => {
       expect(document.querySelector('#cr-declines').textContent).toBe('1')
     })
 
-    it.skip('não exibe duas vezes para o mesmo transactionId', async () => {
+    it('exibe modal para uma recusa da Tuna sem metadados opcionais', async () => {
+      runScript()
+      const tunaDeniedOrderForm = {
+        paymentData: {
+          transactions: [{ transactionId: '135282F000D66A1', status: 'denied' }],
+        },
+        orderFormId: 'of-tuna-denied',
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [tunaDeniedOrderForm])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+      expect(document.querySelector('#cr-declines').textContent).toBe('1')
+    })
+
+    it('não exibe duas vezes para o mesmo transactionId', async () => {
       runScript()
       const of = {
         paymentData: {
@@ -129,7 +173,7 @@ describe('PaySave', () => {
       expect(modalViews.length).toBe(1)
     })
 
-    it.skip('dispara evento payment_declined no dataLayer', async () => {
+    it('dispara evento payment_declined no dataLayer', async () => {
       window.dataLayer = []
       runScript()
       const of = {
@@ -144,6 +188,99 @@ describe('PaySave', () => {
       await new Promise((r) => setTimeout(r, 50))
       const evts = window.dataLayer.filter((e) => e.event === 'paysave_payment_declined')
       expect(evts.length).toBe(1)
+    })
+
+    it('detecta a mensagem em português de transação não autorizada', async () => {
+      runScript()
+      const of = {
+        paymentData: { transactions: [], payments: [] },
+        messages: [{ text: 'A transação não foi autorizada.' }],
+        orderFormId: 'of-authorization-error',
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [of])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+    })
+
+    it('exibe modal ao receber transactionValidation denied do gateway', async () => {
+      window.dataLayer = []
+      runScript()
+      window.$(document).trigger('transactionValidation.vtex', [
+        { status: 'denied', source: 'gateway-test' },
+      ])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+      expect(document.querySelector('#cr-declines').textContent).toBe('1')
+      expect(
+        window.dataLayer.filter((e) => e.event === 'paysave_payment_declined')
+      ).toHaveLength(1)
+    })
+
+    it('exibe modal para erro HTTP de transação do Checkout', async () => {
+      window.dataLayer = []
+      window.vtexjs = {
+        checkout: {
+          orderForm: {
+            paymentData: {
+              paymentSystems: [
+                { id: 125, name: 'Pix', groupName: 'instantPaymentPaymentGroup' },
+                { id: 178, name: 'Nubank', groupName: 'NubankPaymentGroup' },
+              ],
+            },
+          },
+        },
+      }
+      runScript()
+      window.$(document).trigger('ajaxError', [
+        { status: 403 },
+        { url: '/api/checkout/pub/orderForm/of-1/transactions' },
+      ])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+      expect(
+        window.dataLayer.filter((e) => e.event === 'paysave_payment_declined')
+      ).toHaveLength(1)
+      expect(document.querySelectorAll('[data-cr-action]').length).toBe(2)
+      expect(document.querySelector('[data-cr-action="nubank"]')).not.toBeNull()
+    })
+
+    it('exibe modal quando o gateway retorna denied com HTTP 200', async () => {
+      window.dataLayer = []
+      runScript()
+      window.$(document).trigger('ajaxComplete', [
+        { status: 200, responseText: '{"status":"denied","acquirer":"Tuna"}' },
+        { url: '/api/checkout/pub/orderForm/of-1/transactions' },
+      ])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+      expect(
+        window.dataLayer.filter((event) => event.event === 'paysave_payment_declined')
+      ).toHaveLength(1)
+    })
+
+    it('exibe modal ao encontrar o status denied no aviso nativo', async () => {
+      runScript()
+      const nativeMessage = document.createElement('div')
+      nativeMessage.textContent = 'Visa (2097): acquirer:Tuna - status:denied'
+      document.body.appendChild(nativeMessage)
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(false)
+    })
+
+    it('não duplica o modal para erros HTTP consecutivos de transação', async () => {
+      window.dataLayer = []
+      runScript()
+      const response = { status: 403 }
+      const request = { url: '/api/checkout/pub/orderForm/of-1/transactions' }
+      window.$(document).trigger('ajaxError', [response, request])
+      window.$(document).trigger('ajaxError', [response, request])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(
+        window.dataLayer.filter((e) => e.event === 'paysave_payment_declined')
+      ).toHaveLength(1)
+      expect(
+        window.dataLayer.filter((e) => e.event === 'paysave_recovery_modal_view')
+      ).toHaveLength(1)
     })
   })
 
@@ -167,9 +304,15 @@ describe('PaySave', () => {
     it('fecha modal e envia evento ao selecionar Pix', async () => {
       window.dataLayer = []
       await openRecovery()
+      const nativePix = document.createElement('button')
+      nativePix.id = 'payment-group-instantPaymentPaymentGroup'
+      let nativePixClicked = false
+      nativePix.addEventListener('click', () => { nativePixClicked = true })
+      document.body.appendChild(nativePix)
       document.querySelector('[data-cr-action="pix"]').click()
       await new Promise((r) => setTimeout(r, 50))
       expect(document.querySelector('#cr-modal').classList.contains('cr-hidden')).toBe(true)
+      expect(nativePixClicked).toBe(true)
       const evts = window.dataLayer.filter((e) => e.event === 'paysave_checkout_recovered')
       expect(evts.length).toBe(1)
       expect(evts[0].new_method).toBe('pix')
@@ -177,11 +320,11 @@ describe('PaySave', () => {
 
     it('exibe toast de confirmação', async () => {
       await openRecovery()
-      document.querySelector('[data-cr-action="boleto"]').click()
+      document.querySelector('[data-cr-action="retry"]').click()
       await new Promise((r) => setTimeout(r, 50))
       const toast = document.querySelector('#cr-toast')
       expect(toast.classList.contains('cr-hidden')).toBe(false)
-      expect(toast.textContent).toContain('Boleto')
+      expect(toast.textContent).toContain('novo cartão')
     })
   })
 
@@ -276,7 +419,7 @@ describe('PaySave', () => {
     })
 
     it('usa prefixo cr- em todas as classes do CSS', () => {
-      const css = readFileSync(join(__dirname, '..', 'pixel', 'paysave.css'), 'utf8')
+      const css = readFileSync(join(__dirname, '..', 'checkout-ui-custom', 'checkout6-custom.css'), 'utf8')
       const classes = css.match(/\.[a-z][a-z0-9_-]+/gi) || []
       const bad = classes.filter((c) => !c.startsWith('.cr-'))
       expect(bad.length).toBe(0)

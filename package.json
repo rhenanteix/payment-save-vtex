@@ -6,7 +6,11 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "presentation": "npx serve dist/presentation"
+    "presentation": "npx serve dist/presentation",
+    "landing": "npx serve landing",
+    "docs:dev": "cd docs && mint dev --no-open --port 3000",
+    "docs:validate": "cd docs && mint validate",
+    "docs:links": "cd docs && mint broken-links"
   },
   "devDependencies": {
     "vitest": "^2.1.0",
