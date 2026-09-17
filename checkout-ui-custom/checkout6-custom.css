@@ -19,9 +19,9 @@
 
 /* ─── Variáveis ───────────────────────────────────────────────────────────── */
 #cr-root {
-  --cr-green: #086b4d;
-  --cr-green-light: #dff3eb;
-  --cr-orange: #ff8800;
+  --cr-green: #ff9933;
+  --cr-green-light: #fff4e6;
+  --cr-orange: #161616;
   --cr-danger: #d54b45;
   --cr-ink: #404040;
   --cr-muted: #6b6b6b;
@@ -357,9 +357,9 @@
 }
 
 .cr-chat header {
-  background: var(--cr-green);
+  background: #ff9933;
   color: #fff;
-  padding: 14px 16px;
+  padding: 15px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -370,13 +370,19 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #f2c7a4;
-  color: #69442f;
+  background: #fff;
+  color: #ff9933;
   display: grid;
   place-items: center;
   font-weight: 900;
-  font-size: 16px;
+  font-size: 21px;
   flex-shrink: 0;
+}
+.cr-agent-avatar img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .cr-chat header div:nth-child(2) {
@@ -399,14 +405,14 @@
   display: inline-block;
   width: 7px;
   height: 7px;
-  background: #70e6ae;
+  background: #fff;
   border-radius: 50%;
 }
 
 .cr-chat header button {
   background: none;
   border: 0;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.84);
   font-size: 24px;
   cursor: pointer;
   line-height: 1;
@@ -416,13 +422,13 @@
   font-family: inherit;
 }
 .cr-chat header button:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
 }
 
 .cr-messages {
   padding: 16px;
-  background: #f4f7f6;
+  background: #fafafa;
   flex: 1;
   overflow-y: auto;
   display: flex;
@@ -444,7 +450,7 @@
 .cr-user-msg {
   align-self: flex-end;
   border-radius: 14px 4px 14px 14px;
-  background: var(--cr-green-light);
+  background: #fff0df;
 }
 .cr-bot-msg time,
 .cr-user-msg time {
@@ -472,7 +478,7 @@
 .cr-chat-method {
   width: 100%;
   background: #fff;
-  border: 1px solid #efb2c5;
+  border: 1px solid #ffc080;
   color: var(--cr-ink);
   border-radius: 7px;
   padding: 8px 9px;
@@ -484,7 +490,7 @@
   font-family: inherit;
   text-align: left;
 }
-.cr-chat-method:hover { border-color: var(--cr-green); background: var(--cr-green-light); }
+.cr-chat-method:hover { border-color: #ff9933; background: #fff4e6; }
 .cr-chat-method .cr-method-icon { width: 28px; height: 28px; }
 .cr-chat-method strong, .cr-chat-method small { display: block; }
 .cr-chat-method strong { font-size: 11px; }
@@ -498,8 +504,8 @@
 }
 .cr-quick-actions button {
   background: #fff;
-  border: 1px solid #efb2c5;
-  color: var(--cr-green);
+  border: 1px solid #ffc080;
+  color: #161616;
   border-radius: 7px;
   padding: 8px 12px;
   font-size: 11px;
@@ -510,8 +516,77 @@
   text-align: left;
 }
 .cr-quick-actions button:hover {
-  background: var(--cr-green-light);
-  border-color: var(--cr-green);
+  background: #fff4e6;
+  border-color: #ff9933;
+}
+
+.cr-chat-products {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 4px;
+}
+.cr-chat-products > p {
+  margin: 0;
+  color: #53615d;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cr-chat-product {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #d9e1de;
+  border-radius: 7px;
+}
+.cr-chat-product > img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+.cr-chat-product > div {
+  min-width: 0;
+}
+.cr-chat-product strong,
+.cr-chat-product small,
+.cr-chat-product span {
+  display: block;
+}
+.cr-chat-product strong {
+  color: var(--cr-ink);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cr-chat-product small {
+  color: #65716d;
+  font-size: 9px;
+  line-height: 1.3;
+}
+.cr-chat-product span {
+  color: var(--cr-green);
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.cr-chat-product button {
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 8px;
+  background: #ff9933;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+.cr-chat-product button:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 #cr-chat-form {

@@ -91,6 +91,8 @@ O PaySave é uma camada de recuperação. Ele nunca autoriza, captura ou cancela
 - Métodos renderizados do `orderForm`: Pix, Pagaleve, Nubank e uma opção de cartão quando esses grupos estiverem habilitados; fallback configurável para cada parceiro.
 - Ícones oficiais usados pelo Checkout VTEX para os métodos reconhecidos.
 - Chat de suporte, respostas rápidas e painel de métricas da sessão no workspace de desenvolvimento.
+- Produtos alternativos configurados no chat, adicionados pelo carrinho nativo da VTEX.
+- Assistente de IA opcional por endpoint seguro da loja, sem credenciais ou dados sensíveis no Checkout.
 - Eventos `dataLayer` para acompanhar recusa, visualização, seleção de método e recuperação.
 - Modo controlado `?cr-debug=1` para abrir o modal no Checkout de uma workspace, sem tentativa de cobrança.
 - Feature flag `enabled` para interrupção imediata em uma nova versão do app.
@@ -163,6 +165,10 @@ accentColor: '#004e70',
 ```
 
 `chatHumanUrl` pode ser uma URL de WhatsApp, Zendesk, CRM, central de ajuda ou qualquer outro canal externo que comece com `https://` ou `http://`. O botão abre o destino em nova aba. O chat não envia dados de cartão, CVV ou token para esse canal.
+
+### Produtos alternativos e IA no chat
+
+É possível exibir produtos similares ou de menor valor no chat e adicioná-los diretamente pelo carrinho nativo da VTEX. Configure os SKUs, preços e textos escolhidos pela loja em `chatProductSuggestions`; o exemplo completo e o contrato do endpoint de IA estão em [Configuração por loja](docs/configuration.mdx). A VTEX não expõe uma probabilidade de limite de cartão, portanto essa seleção deve ser uma curadoria comercial ou vir do backend de recomendação da loja.
 
 ### Métodos de pagamento e outras empresas
 
@@ -294,10 +300,14 @@ npx serve dist
 
 ## Próximas evoluções
 
-- [x] Piloto privado com feature flag `enabled` desativada por padrão.
-- [x] Split payment nativo opcional, mantido desativado até validação do parceiro.
-- [ ] Criar app administrativo VTEX para configurar textos, cores, meios e integrações sem editar código.
-- [ ] Criar API de recuperação para e-mail, CRM ou WhatsApp com segurança, idempotência e conformidade LGPD.
-- [ ] Criar webhook para notificar o parceiro sobre recuperações.
-- [ ] Adicionar variantes A/B configuráveis e relatório de conversão por meio escolhido.
-- [ ] Preparar cadastro e aprovação para VTEX App Store após a configuração autônoma e o suporte operacional estarem prontos.
+Consulte o [roadmap visual do produto](website/docs/product-roadmap.md) para visualizar a sequência de piloto, configuração por parceiro, Admin, recuperação conectada e App Store.
+
+1. [ ] Fechar o checklist P0: modal única, backdrop removido, meios nativos e rollback em uma conta piloto.
+2. [ ] Configurar funil P1 no GTM/GA4 para medir recusa, visualização, seleção e retorno ao Checkout.
+3. [ ] Validar os `groupName` de pagamento e fallback P2 em cada novo parceiro.
+4. [ ] Configurar WhatsApp, Zendesk ou CRM como handoff P4 sem dados financeiros.
+5. [ ] Criar perfis assistidos por parceiro com textos, cores e feature flags.
+6. [ ] Criar app administrativo VTEX P3 para configuração autônoma, antes de ampliar a instalação.
+7. [ ] Criar API/dashboard de recuperação, webhook e automações de CRM com segurança e LGPD.
+8. [ ] Adicionar variantes A/B P5 e relatórios comparáveis por parceiro.
+9. [ ] Preparar o cadastro P6 na VTEX App Store após comprovar autonomia, suporte e valor.

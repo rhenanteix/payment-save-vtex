@@ -68,15 +68,21 @@
       optionsTitle: 'Escolha a melhor alternativa',
       supportText: 'Quero ajuda para concluir minha compra',
       chatGreeting: 'Olá! Vi que o banco não aprovou a tentativa, mas seu pedido continua reservado. Posso te ajudar a concluir?',
-      chatPaymentTitle: 'Como prefere continuar?',
+      chatPaymentTitle: 'Escolha uma opção para continuar com segurança:',
+      chatLogoUrl: '',
       chatHumanLabel: 'Falar com o atendimento',
       chatHumanUrl: '',
       chatHumanMessage: 'Posso conectar você ao atendimento da loja para continuar por outro canal.',
+      chatProductSuggestions: [],
+      chatCatalogSuggestions: true,
+      chatCatalogSuggestionsLimit: 3,
+      aiEndpoint: '',
+      aiRequestTimeoutMs: 5000,
       launcherTitle: 'Precisa de ajuda?',
       launcherSubtitle: 'Fale com a gente',
-      primaryColor: '#e50046',
-      primaryLightColor: '#fff0f4',
-      accentColor: '#004e70',
+      primaryColor: '#ff9933',
+      primaryLightColor: '#fff4e6',
+      accentColor: '#161616',
       paymentMethods: DEFAULT_PAYMENT_METHODS,
       enableSplitPayment: false,
       splitPaymentSelector: '[data-testid="split-payment"], [data-payment-action="split-payment"], .add-payment',
@@ -100,6 +106,8 @@
     timer: null,
     secondsLeft: S.reservationMinutes * 60,
     currentOrderForm: null,
+    catalogSuggestions: [],
+    catalogSuggestionKey: null,
   }
 
   /* ────────────────────────────────────────────────────────────────────
@@ -165,6 +173,7 @@
 
     Object.keys(groups).forEach(function (groupName) {
       var system = groups[groupName]
+      var systemName = String((system || {}).name || '')
       var method = null
 
       if (groupName === 'instantPaymentPaymentGroup') {
@@ -185,7 +194,7 @@
           iconClass: 'cr-card',
           icon: '<img class="cr-logo-vtex cr-logo-card" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/ico-credit2.png" alt="">',
         }
-      } else if (/pagaleve/i.test(groupName)) {
+      } else if (/pagaleve/i.test(groupName) || /pagaleve/i.test(systemName)) {
         method = {
           id: 'pagaleve',
           label: system.name || 'Pix Parcelado',
@@ -194,7 +203,7 @@
           iconClass: 'cr-pagaleve',
           icon: '<img class="cr-logo-vtex cr-logo-pagaleve" src="https://io2.vtex.com/checkout-ui/v6.152.1/img/pagaleve/payment-pagaleve-logo.png" alt="">',
         }
-      } else if (/nubank/i.test(groupName)) {
+      } else if (/nubank|nupay/i.test(groupName) || /nubank|nupay/i.test(systemName)) {
         method = {
           id: 'nubank',
           label: system.name || 'NuPay',
@@ -239,6 +248,119 @@
         ].join('')
       })
       .join('')
+  }
+
+  function getChatProductSuggestions() {
+    var suggestions = S.chatProductSuggestions
+    if (typeof suggestions === 'string') {
+      try {
+        suggestions = JSON.parse(suggestions)
+      } catch (e) {
+        suggestions = []
+      }
+    }
+    if (!Array.isArray(suggestions)) suggestions = []
+    suggestions = suggestions.filter(function (product) {
+      return product && product.id && product.sku && product.name
+    })
+    if (suggestions.length) return suggestions
+    if (state.catalogSuggestions.length) return state.catalogSuggestions
+    if (!isDevWorkspace || !isDebugMode()) return suggestions
+
+    var item = ((state.currentOrderForm || {}).items || [])[0]
+    if (!item || !item.id || !item.name) return suggestions
+    return [{
+      id: 'debug-current-cart-item-' + item.id,
+      sku: item.id,
+      seller: item.seller || '1',
+      quantity: 1,
+      name: item.name,
+      description: 'Demonstração: adicionar mais uma unidade do item atual',
+      price: '',
+    }]
+  }
+
+  function chatProductSuggestionsHtml() {
+    var suggestions = getChatProductSuggestions()
+    if (!suggestions.length) return ''
+    return [
+      '<section class="cr-chat-products" aria-label="Alternativas de produtos">',
+      '<p>' + escapeHtml(S.chatProductSuggestionsTitle || 'Prefere reduzir o valor da compra?') + '</p>',
+      suggestions.map(function (product) {
+        var image = isExternalSupportUrl(product.image)
+          ? '<img src="' + escapeHtml(product.image) + '" alt="">'
+          : ''
+        return [
+          '<article class="cr-chat-product">',
+          image,
+          '<div><strong>' + escapeHtml(product.name) + '</strong>',
+          product.description ? '<small>' + escapeHtml(product.description) + '</small>' : '',
+          product.price ? '<span>' + escapeHtml(product.price) + '</span>' : '',
+          '</div>',
+          '<button data-cr-product-id="' + escapeHtml(product.id) + '">Adicionar</button>',
+          '</article>',
+        ].join('')
+      }).join(''),
+      '</section>',
+    ].join('')
+  }
+
+  function getChatProductSuggestion(id) {
+    var suggestions = getChatProductSuggestions()
+    for (var i = 0; i < suggestions.length; i++) {
+      if (String(suggestions[i].id) === String(id)) return suggestions[i]
+    }
+    return null
+  }
+
+  function formatPrice(value) {
+    var price = Number(value)
+    if (!isFinite(price) || price <= 0) return ''
+    return price.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+
+  function normalizeCatalogSuggestion(product, excludedProductId) {
+    var sku = (product.items || [])[0]
+    var seller = ((sku || {}).sellers || [])[0]
+    var offer = (seller || {}).commertialOffer || {}
+    if (!product || !sku || !sku.itemId || !seller || String(product.productId) === String(excludedProductId)) return null
+    return {
+      id: 'catalog-' + sku.itemId,
+      sku: sku.itemId,
+      seller: seller.sellerId || '1',
+      quantity: 1,
+      name: product.productName || product.productTitle || 'Produto recomendado',
+      description: product.brand || 'Alternativa disponível na loja',
+      price: formatPrice(offer.Price),
+      image: (((sku.images || [])[0] || {}).imageUrl || ''),
+    }
+  }
+
+  function loadCatalogSuggestions() {
+    var item = ((state.currentOrderForm || {}).items || [])[0]
+    var key = item && (item.productId || item.id)
+    if (!S.chatCatalogSuggestions || !key || !item.name || state.catalogSuggestionKey === key || typeof window.fetch !== 'function') return
+
+    state.catalogSuggestionKey = key
+    window.fetch('/api/catalog_system/pub/products/search?ft=' + encodeURIComponent(item.name) + '&_from=0&_to=' + Math.max(2, Number(S.chatCatalogSuggestionsLimit) || 3))
+      .then(function (response) {
+        if (!response.ok) throw new Error('catalog_unavailable')
+        return response.json()
+      })
+      .then(function (products) {
+        state.catalogSuggestions = (Array.isArray(products) ? products : [])
+          .map(function (product) { return normalizeCatalogSuggestion(product, item.productId) })
+          .filter(Boolean)
+          .slice(0, Number(S.chatCatalogSuggestionsLimit) || 3)
+        renderChatProductSuggestions()
+        if (state.catalogSuggestions.length) pushEvent('chat_catalog_suggestions_loaded', { count: state.catalogSuggestions.length })
+      })
+      .catch(function () {
+        state.catalogSuggestions = []
+      })
   }
 
   function isExternalSupportUrl(value) {
@@ -478,10 +600,14 @@
       // Chat
       '<aside id="cr-chat" class="cr-chat cr-hidden" aria-label="Assistente de compra">',
       '  <header>',
-      '    <div class="cr-agent-avatar" aria-hidden="true">' + escapeHtml(S.assistantName[0].toUpperCase()) + '</div>',
+      '    <div class="cr-agent-avatar" aria-hidden="true">' +
+        (isExternalSupportUrl(S.chatLogoUrl)
+          ? '<img src="' + escapeHtml(S.chatLogoUrl) + '" alt="">'
+          : '<b>T</b>') +
+      '</div>',
       '    <div>',
-      '      <strong>' + escapeHtml(S.assistantName) + ' &middot; Assistente de compra</strong>',
-      '      <span><i></i> Online agora</span>',
+      '      <strong>' + escapeHtml(S.assistantName) + '</strong>',
+      '      <span><i></i> Atendimento para finalizar sua compra</span>',
       '    </div>',
       '    <button id="cr-chat-close" data-cr-chat-close aria-label="Fechar chat">&times;</button>',
       '  </header>',
@@ -497,6 +623,7 @@
       '    <div class="cr-quick-actions">',
       '      <button data-cr-chat-action="human">' + escapeHtml(S.chatHumanLabel) + '</button>',
       '    </div>',
+      '    <div id="cr-chat-product-suggestions">' + chatProductSuggestionsHtml() + '</div>',
       '  </div>',
       '  <form id="cr-chat-form">',
       '    <input id="cr-chat-input" placeholder="Digite sua mensagem..." aria-label="Mensagem">',
@@ -567,6 +694,13 @@
     var options = qs('#cr-chat-payment-options')
     if (!options) return
     options.innerHTML = chatPaymentOptionsHtml(orderForm)
+    bindChatPaymentEvents()
+  }
+
+  function renderChatProductSuggestions() {
+    var container = qs('#cr-chat-product-suggestions')
+    if (!container) return
+    container.innerHTML = chatProductSuggestionsHtml()
     bindChatPaymentEvents()
   }
 
@@ -693,9 +827,11 @@
    * ────────────────────────────────────────────────────────────────────*/
   function openChat() {
     closeModal()
-    renderChatPaymentOptions(
-      state.currentOrderForm || (((window.vtexjs || {}).checkout || {}).orderForm || null)
-    )
+    var orderForm = state.currentOrderForm || (((window.vtexjs || {}).checkout || {}).orderForm || null)
+    if (orderForm) state.currentOrderForm = orderForm
+    renderChatPaymentOptions(orderForm)
+    renderChatProductSuggestions()
+    loadCatalogSuggestions()
     var chat = qs('#cr-chat')
     var launcher = qs('#cr-launcher')
     var badge = qs('#cr-badge')
@@ -710,9 +846,105 @@
     if (!msgs) return
     var div = document.createElement('div')
     div.className = 'cr-bot-msg'
-    div.innerHTML = text + '<time>agora</time>'
+    div.innerHTML = escapeHtml(text) + '<time>agora</time>'
     msgs.appendChild(div)
     msgs.scrollTop = msgs.scrollHeight
+  }
+
+  function addSuggestedProduct(id) {
+    var product = getChatProductSuggestion(id)
+    var checkout = ((window.vtexjs || {}).checkout || {})
+    if (!product || typeof checkout.addToCart !== 'function') return
+
+    var button = qs('[data-cr-product-id="' + id + '"]')
+    if (button) {
+      button.disabled = true
+      button.textContent = 'Adicionando...'
+    }
+
+    var item = {
+      id: product.sku,
+      quantity: Number(product.quantity) > 0 ? Number(product.quantity) : 1,
+      seller: String(product.seller || '1'),
+    }
+    Promise.resolve(checkout.addToCart([item]))
+      .then(function (orderForm) {
+        if (orderForm) state.currentOrderForm = orderForm
+        pushEvent('chat_product_added', { product_id: product.id, sku: product.sku })
+        botReply(product.name + ' foi adicionado ao seu carrinho.')
+        if (button) button.textContent = 'Adicionado'
+      })
+      .catch(function () {
+        if (button) {
+          button.disabled = false
+          button.textContent = 'Tentar novamente'
+        }
+        botReply('Não foi possível adicionar este produto agora. Tente novamente ou fale com o atendimento.')
+      })
+  }
+
+  function getAssistantFallbackReply() {
+    return 'Posso ajudar você a escolher outra forma de pagamento, entender o parcelamento disponível ou ver produtos semelhantes. Por segurança, não compartilhe dados de pagamento ou senhas por aqui.'
+  }
+
+  function getCheckoutReply(message) {
+    var text = String(message || '').toLowerCase()
+    if (/pix|boleto|pagaleve|nupay|nubank|pagamento|cart[aã]o|parcel/.test(text)) {
+      return 'Você pode selecionar uma das formas de pagamento acima. A confirmação e as condições de parcelamento são mostradas pela própria Trocafone antes de finalizar.'
+    }
+    if (/produto|celular|modelo|valor|pre[cç]o|barat/.test(text)) {
+      return 'Estou buscando alternativas do catálogo para você. Quando aparecerem, escolha Adicionar para incluir o item no carrinho.'
+    }
+    if (/atendimento|humano|ajuda|suporte/.test(text)) {
+      return S.chatHumanMessage
+    }
+    return getAssistantFallbackReply()
+  }
+
+  function askAssistant(message) {
+    if (!isExternalSupportUrl(S.aiEndpoint) || typeof window.fetch !== 'function') {
+      botReply(getCheckoutReply(message))
+      return
+    }
+
+    var orderForm = state.currentOrderForm || {}
+    var items = (orderForm.items || []).map(function (item) {
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }
+    })
+    var controller = window.AbortController ? new window.AbortController() : null
+    var timeout = setTimeout(function () {
+      if (controller) controller.abort()
+    }, Number(S.aiRequestTimeoutMs) || 5000)
+
+    window.fetch(S.aiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller && controller.signal,
+      body: JSON.stringify({
+        message: message,
+        cart: { items: items, totalValue: orderForm.value || 0 },
+        paymentStatus: 'declined',
+      }),
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('assistant_unavailable')
+        return response.json()
+      })
+      .then(function (response) {
+        var reply = response && typeof response.reply === 'string' ? response.reply.trim() : ''
+        botReply(reply || getAssistantFallbackReply())
+        pushEvent('ai_chat_reply')
+      })
+      .catch(function () {
+        botReply(getAssistantFallbackReply())
+        pushEvent('ai_chat_fallback')
+      })
+      .then(function () { clearTimeout(timeout) })
   }
 
   function openExternalSupport() {
@@ -808,10 +1040,9 @@
           input.value.replace(/[<>]/g, '') + '<time>agora</time>'
         if (msgs) msgs.appendChild(div)
         pushEvent('chat_message_sent')
+        var message = input.value.trim()
         input.value = ''
-        setTimeout(function () {
-          botReply('Entendi. Posso manter seu pedido reservado enquanto ajudamos você com o pagamento.')
-        }, 600)
+        askAssistant(message)
       })
     }
 
@@ -847,6 +1078,12 @@
         pushEvent('chat_payment_option_selected', { option: action })
         botReply('Perfeito. Vou abrir ' + escapeHtml((method || {}).label || 'essa forma de pagamento') + ' para você.')
         recover(action)
+      })
+    })
+
+    qsa('[data-cr-product-id]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        addSuggestedProduct(btn.getAttribute('data-cr-product-id'))
       })
     })
   }

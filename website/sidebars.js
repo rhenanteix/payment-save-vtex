@@ -10,7 +10,7 @@ const sidebars = {
       type: 'category', label: 'Operação',
       items: ['declines', 'native-alert', 'analytics', 'support-chat', 'recovery-api'],
     },
-    {type: 'category', label: 'Evolução', items: ['split-payment', 'experiments', 'production']},
+    {type: 'category', label: 'Evolução', items: ['product-roadmap', 'split-payment', 'experiments', 'production']},
   ],
 }
 

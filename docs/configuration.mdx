@@ -33,3 +33,36 @@ Quando uma loja tiver grupos diferentes, configure `paymentMethods` no objeto `S
 <Info>
   O PaySave não cria um método de pagamento. Confirme o seletor em um workspace de desenvolvimento antes de publicar uma alteração.
 </Info>
+
+## Produtos alternativos no chat
+
+A VTEX expõe no `orderForm` os itens já presentes no carrinho, mas não fornece um indicador de chance de aprovação pelo limite do cartão nem um catálogo de produtos similares. Para oferecer alternativas de menor valor no chat, configure a curadoria da loja em `chatProductSuggestions`. O botão **Adicionar** usa `vtexjs.checkout.addToCart`, a API nativa do Checkout, e inclui o SKU no carrinho sem coletar dados de pagamento.
+
+```js
+chatProductSuggestionsTitle: 'Uma opção com valor menor pode ajudar',
+chatProductSuggestions: [
+  {
+    id: 'iphone-se-128gb',
+    sku: '12345',
+    seller: '1',
+    quantity: 1,
+    name: 'iPhone SE 128 GB',
+    description: 'Modelo compacto com valor menor',
+    price: 'R$ 1.999,00',
+    image: 'https://cdn.example.com/iphone-se.jpg'
+  }
+]
+```
+
+O `sku` deve ser o ID real de SKU da conta VTEX e o `seller` deve corresponder ao seller do item. Valide os dois valores na workspace antes de publicar. O PaySave adiciona o item, não substitui nem remove o produto original do carrinho.
+
+## Assistente com IA
+
+Para respostas geradas por IA, configure `aiEndpoint` com uma URL HTTPS de um backend da loja. Nunca coloque uma chave de provedor de IA no `checkout6-custom.js`: o browser do Checkout é público. A chamada envia apenas a mensagem do cliente, os itens do carrinho (`id`, nome, quantidade e preço), total e o status `declined`; ela não envia perfil, contato ou dados de pagamento.
+
+```js
+aiEndpoint: 'https://api.sualoja.com/paysave/assistant',
+aiRequestTimeoutMs: 5000,
+```
+
+O endpoint deve aceitar `POST` JSON e devolver `{"reply":"texto seguro para o cliente"}`. Ele deve filtrar solicitações de dados sensíveis e limitar a IA a orientar o Checkout e as alternativas configuradas. Sem endpoint, o chat continua funcionando com uma resposta local e opções de pagamento.

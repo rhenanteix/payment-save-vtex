@@ -137,6 +137,23 @@ describe('PaySave', () => {
       await new Promise((r) => setTimeout(r, 50))
       expect(document.querySelector('[data-cr-action="split-card"]')).not.toBeNull()
     })
+
+    it('reconhece Pagaleve pelo nome do sistema quando o grupo é diferente', async () => {
+      runScript()
+      const orderForm = {
+        paymentData: {
+          paymentSystems: [
+            { name: 'Pagaleve Pix Mensal Transparente', groupName: 'customPaymentGroup' },
+          ],
+          transactions: [{ transactionId: 'tx-pagaleve', status: 'denied' }],
+        },
+      }
+      window.$(window).trigger('orderFormUpdated.vtex', [orderForm])
+      await new Promise((r) => setTimeout(r, 50))
+      expect(document.querySelector('[data-cr-action="pagaleve"]')).not.toBeNull()
+      document.querySelector('#cr-talk-now').click()
+      expect(document.querySelector('[data-cr-chat-method="pagaleve"]')).not.toBeNull()
+    })
   })
 
   describe('detecção de recusa', () => {
@@ -327,7 +344,7 @@ describe('PaySave', () => {
         messages: [{ text: 'denied' }],
         orderFormId: 'of-1',
         clientProfileData: { firstName: 'Rhenan' },
-        items: [{ name: 'iPhone 13' }],
+        items: [{ id: '123', productId: 'current-product', name: 'iPhone 13' }],
       }
       window.$(window).trigger('orderFormUpdated.vtex', [of])
       await new Promise((r) => setTimeout(r, 50))
@@ -385,7 +402,7 @@ describe('PaySave', () => {
         messages: [{ text: 'denied' }],
         orderFormId: 'of-1',
         clientProfileData: { firstName: 'Rhenan' },
-        items: [{ name: 'iPhone 13' }],
+        items: [{ id: '123', productId: 'current-product', name: 'iPhone 13' }],
       }
       window.$(window).trigger('orderFormUpdated.vtex', [of])
       await new Promise((r) => setTimeout(r, 50))
@@ -420,6 +437,15 @@ describe('PaySave', () => {
       expect(msgs.length).toBe(1)
     })
 
+    it('orienta o cliente sobre pagamento sem uma IA configurada', async () => {
+      await openRecovery()
+      document.querySelector('#cr-talk-now').click()
+      const input = document.querySelector('#cr-chat-input')
+      input.value = 'Quais parcelas estão disponíveis no cartão?'
+      document.querySelector('#cr-chat-form').dispatchEvent(new Event('submit', { cancelable: true }))
+      expect(document.querySelector('#cr-messages').textContent).toContain('parcelamento')
+    })
+
     it('mostra no chat todos os mesmos meios disponíveis na modal', async () => {
       runScript()
       const of = {
@@ -451,6 +477,87 @@ describe('PaySave', () => {
       document.querySelector('[data-cr-chat-action="human"]').click()
       expect(openSpy).toHaveBeenCalledWith('https://empresa.example/atendimento', '_blank', 'noopener,noreferrer')
       openSpy.mockRestore()
+    })
+
+    it('adiciona ao carrinho um produto alternativo configurado', async () => {
+      globalThis.__cr_settings = {
+        chatProductSuggestions: [
+          { id: 'iphone-se', sku: '123', name: 'iPhone SE', quantity: 1, seller: '1' },
+        ],
+      }
+      const addToCart = vi.fn().mockResolvedValue({ items: [{ id: '123' }] })
+      window.vtexjs = { checkout: { addToCart } }
+      await openRecovery()
+      document.querySelector('#cr-talk-now').click()
+      document.querySelector('[data-cr-product-id="iphone-se"]').click()
+      await new Promise((r) => setTimeout(r, 0))
+      expect(addToCart).toHaveBeenCalledWith([{ id: '123', quantity: 1, seller: '1' }])
+      expect(document.querySelector('#cr-messages').textContent).toContain('foi adicionado')
+    })
+
+    it('carrega sugestões quando a VTEX disponibiliza o orderForm depois do script', () => {
+      globalThis.__cr_settings = {
+        chatProductSuggestions: [
+          { id: 'produto-alternativo', sku: '456', name: 'Produto alternativo', seller: '1' },
+        ],
+      }
+      runScript()
+      window.vtexjs = {
+        checkout: {
+          orderForm: { items: [{ id: '123', name: 'Produto do carrinho' }] },
+        },
+      }
+      document.querySelector('#cr-talk-now').click()
+      expect(document.querySelector('[data-cr-product-id="produto-alternativo"]')).not.toBeNull()
+    })
+
+    it('busca e exibe cards do catálogo VTEX para o item do carrinho', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{
+          productId: 'outro-produto',
+          productName: 'iPhone recomendado',
+          brand: 'Apple',
+          items: [{
+            itemId: '456',
+            images: [{ imageUrl: 'https://cdn.example/iphone.jpg' }],
+            sellers: [{ sellerId: '1', commertialOffer: { Price: 1999 } }],
+          }],
+        }]),
+      })
+      window.fetch = fetchMock
+      await openRecovery()
+      document.querySelector('#cr-talk-now').click()
+      await new Promise((r) => setTimeout(r, 0))
+      expect(fetchMock.mock.calls[0][0]).toContain('/api/catalog_system/pub/products/search?ft=iPhone%2013')
+      expect(document.querySelector('[data-cr-product-id="catalog-456"]')).not.toBeNull()
+      expect(document.querySelector('#cr-chat-product-suggestions').textContent).toContain('R$ 1.999,00')
+    })
+
+    it('envia à IA somente mensagem e dados do carrinho', async () => {
+      globalThis.__cr_settings = {
+        aiEndpoint: 'https://empresa.example/assistente',
+        chatCatalogSuggestions: false,
+      }
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ reply: 'Tente Pix para concluir.' }),
+      })
+      window.fetch = fetchMock
+      await openRecovery()
+      const input = document.querySelector('#cr-chat-input')
+      input.value = 'Quais opções tenho?'
+      document.querySelector('#cr-talk-now').click()
+      document.querySelector('#cr-chat-form').dispatchEvent(new Event('submit', { cancelable: true }))
+      await new Promise((r) => setTimeout(r, 0))
+      const payload = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(payload).toEqual({
+        message: 'Quais opções tenho?',
+        cart: { items: [{ id: '123', name: 'iPhone 13', quantity: undefined, price: undefined }], totalValue: 0 },
+        paymentStatus: 'declined',
+      })
+      expect(JSON.stringify(payload)).not.toContain('Rhenan')
+      expect(document.querySelector('#cr-messages').textContent).toContain('Tente Pix')
     })
   })
 
